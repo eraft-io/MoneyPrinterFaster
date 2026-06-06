@@ -313,21 +313,27 @@ func (c *Composer) composeFinal(ctx context.Context, videoFile string, opts pipe
 	// 字幕烧录
 	hasSubtitle := false
 	if opts.SubtitlePath != "" && utils.FileExists(opts.SubtitlePath) {
+		log.Printf("[Composer] 字幕文件: %s, 字体: %s, hasSubtitlesFilter=%v", opts.SubtitlePath, c.fontPath, c.hasSubtitlesFilter)
 		if c.hasSubtitlesFilter {
 			// 方案一：subtitles 滤镜（需要 libass）
 			hasSubtitle = true
 			// 指定 fontsdir 和 force_style 确保在 CentOS 等缺少中文字体的系统上也能正常渲染
 			fontDir := filepath.Dir(c.fontPath)
-			args = append(args, "-vf", fmt.Sprintf(
+			// 转义 fontsdir 路径中的冒号和单引号
+			escapedFontDir := strings.ReplaceAll(fontDir, ":", "\\:")
+			escapedSubPath := strings.ReplaceAll(opts.SubtitlePath, ":", "\\:")
+			vfArg := fmt.Sprintf(
 				"subtitles='%s':fontsdir='%s':force_style='FontName=Noto Sans SC,FontSize=24,Bold=1'",
-				opts.SubtitlePath, fontDir))
+				escapedSubPath, escapedFontDir)
+			log.Printf("[Composer] subtitles 滤镜: %s", vfArg)
+			args = append(args, "-vf", vfArg)
 		} else if c.fontPath != "" {
 			// 方案二：drawtext 降级方案（不需要 libass）
 			drawtextFilter, tempSubFiles := c.buildDrawtextFilter(opts.SubtitlePath, opts.Params.Width(), opts.Params.Height())
 			if drawtextFilter != "" {
 				hasSubtitle = true
 				args = append(args, "-vf", drawtextFilter)
-				log.Printf("[Composer] 使用 drawtext 烧录字幕")
+				log.Printf("[Composer] 使用 drawtext 烧录字幕 (fontfile=%s)", c.fontPath)
 				// FFmpeg 完成后清理字幕临时文件
 				defer func() {
 					for _, f := range tempSubFiles {
