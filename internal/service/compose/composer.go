@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"moneyprinterFaster/assets/fonts"
 	"moneyprinterFaster/internal/model"
 	"moneyprinterFaster/internal/pipeline"
 	"moneyprinterFaster/pkg/utils"
@@ -57,6 +58,17 @@ func NewComposer(ffmpegPath, codec string) (*Composer, error) {
 		hasSubtitlesFilter: hasSubtitles,
 		fontPath:           fontPath,
 	}, nil
+}
+
+// extractBundledFont 提取内嵌的 NotoSansSC 字体到磁盘缓存
+func extractBundledFont() string {
+	path, err := fonts.ExtractFont()
+	if err != nil {
+		log.Printf("[Composer] 提取内嵌字体失败: %v，将尝试系统字体", err)
+		return ""
+	}
+	log.Printf("[Composer] 已提取内嵌字体: %s (%.1fMB)", path, float64(len(fonts.FontBytes()))/(1024*1024))
+	return path
 }
 
 // checkSubtitlesFilter 检测 FFmpeg 是否支持 subtitles 滤镜
@@ -304,7 +316,11 @@ func (c *Composer) composeFinal(ctx context.Context, videoFile string, opts pipe
 		if c.hasSubtitlesFilter {
 			// 方案一：subtitles 滤镜（需要 libass）
 			hasSubtitle = true
-			args = append(args, "-vf", fmt.Sprintf("subtitles='%s'", opts.SubtitlePath))
+			// 指定 fontsdir 和 force_style 确保在 CentOS 等缺少中文字体的系统上也能正常渲染
+			fontDir := filepath.Dir(c.fontPath)
+			args = append(args, "-vf", fmt.Sprintf(
+				"subtitles='%s':fontsdir='%s':force_style='FontName=Noto Sans SC,FontSize=24,Bold=1'",
+				opts.SubtitlePath, fontDir))
 		} else if c.fontPath != "" {
 			// 方案二：drawtext 降级方案（不需要 libass）
 			drawtextFilter, tempSubFiles := c.buildDrawtextFilter(opts.SubtitlePath, opts.Params.Width(), opts.Params.Height())
@@ -537,8 +553,15 @@ func escapeDrawtextString(s string) string {
 	return s
 }
 
-// findSubtitleFont 查找系统可用的中文字体
+// findSubtitleFont 查找可用的中文字体
+// 优先级：1. 内嵌字体  2. 系统字体
 func findSubtitleFont() string {
+	// 优先提取内嵌的 NotoSansSC 字体（解决 CentOS 等系统缺少中文字体的问题）
+	if path := extractBundledFont(); path != "" {
+		return path
+	}
+
+	// 降级：搜索系统字体
 	candidates := []string{
 		// macOS 常见中文字体
 		"/System/Library/Fonts/PingFang.ttc",
@@ -549,6 +572,8 @@ func findSubtitleFont() string {
 		// Linux 常见路径
 		"/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
 		"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+		"/usr/share/fonts/google-noto-cjk/NotoSansCJKsc-Regular.otf",
+		"/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
 		"/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
 		"/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
 	}
