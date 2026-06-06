@@ -316,17 +316,19 @@ func (c *Composer) composeFinal(ctx context.Context, videoFile string, opts pipe
 		log.Printf("[Composer] 字幕文件: %s, 字体: %s, hasSubtitlesFilter=%v", opts.SubtitlePath, c.fontPath, c.hasSubtitlesFilter)
 		if c.hasSubtitlesFilter {
 			// 方案一：subtitles 滤镜（需要 libass）
-			hasSubtitle = true
-			// 指定 fontsdir 和 force_style 确保在 CentOS 等缺少中文字体的系统上也能正常渲染
-			fontDir := filepath.Dir(c.fontPath)
-			// 转义 fontsdir 路径中的冒号和单引号
-			escapedFontDir := strings.ReplaceAll(fontDir, ":", "\\:")
-			escapedSubPath := strings.ReplaceAll(opts.SubtitlePath, ":", "\\:")
-			vfArg := fmt.Sprintf(
-				"subtitles='%s':fontsdir='%s':force_style='FontName=Noto Sans SC,FontSize=24,Bold=1'",
-				escapedSubPath, escapedFontDir)
-			log.Printf("[Composer] subtitles 滤镜: %s", vfArg)
-			args = append(args, "-vf", vfArg)
+			// 将 SRT 转为 ASS 格式，确保字体大小和换行正确
+			assPath := strings.TrimSuffix(opts.SubtitlePath, ".srt") + ".ass"
+			if err := c.srtToASS(opts.SubtitlePath, assPath, opts.Params.Width(), opts.Params.Height()); err != nil {
+				log.Printf("[Composer] SRT 转 ASS 失败: %v，跳过字幕", err)
+			} else {
+				hasSubtitle = true
+				fontDir := filepath.Dir(c.fontPath)
+				escapedFontDir := strings.ReplaceAll(fontDir, ":", "\\:")
+				escapedAssPath := strings.ReplaceAll(assPath, ":", "\\:")
+				vfArg := fmt.Sprintf("ass='%s':fontsdir='%s'", escapedAssPath, escapedFontDir)
+				log.Printf("[Composer] ass 滤镜: %s", vfArg)
+				args = append(args, "-vf", vfArg)
+			}
 		} else if c.fontPath != "" {
 			// 方案二：drawtext 降级方案（不需要 libass）
 			drawtextFilter, tempSubFiles := c.buildDrawtextFilter(opts.SubtitlePath, opts.Params.Width(), opts.Params.Height())
@@ -463,13 +465,13 @@ func (c *Composer) buildDrawtextFilter(srtPath string, width, height int) (strin
 
 	log.Printf("[Composer] 解析到 %d 条字幕 (视频: %dx%d)", len(entries), width, height)
 
-	// 字体大小：视频宽度的 4.5%（1080 → 48px）
-	fontSize := int(float64(width) * 0.045)
-	if fontSize < 28 {
-		fontSize = 28
+	// 字体大小：视频宽度的 3.5%（1080 → 37px，720 → 25px）
+	fontSize := int(float64(width) * 0.035)
+	if fontSize < 18 {
+		fontSize = 18
 	}
-	if fontSize > 60 {
-		fontSize = 60
+	if fontSize > 48 {
+		fontSize = 48
 	}
 
 	// 每行最大字符数（保守估计：中文字符宽度 ≈ 字体大小）
@@ -548,6 +550,95 @@ func wrapLines(text string, maxChars int) []string {
 		result = append(result, string(runes))
 	}
 	return result
+}
+
+// srtToASS 将 SRT 字幕转换为 ASS 格式，解决字体大小和换行问题
+// 生成的 ASS 文件包含正确的 PlayResX/PlayResY、字体样式和自动换行
+func (c *Composer) srtToASS(srtPath, assPath string, width, height int) error {
+	entries, err := parseSRT(srtPath)
+	if err != nil {
+		return fmt.Errorf("解析 SRT 失败: %w", err)
+	}
+	if len(entries) == 0 {
+		return fmt.Errorf("SRT 文件无字幕条目")
+	}
+
+	// 字体大小：视频宽度的 3.5%（1080 → 37px，720 → 25px）
+	fontSize := int(float64(width) * 0.035)
+	if fontSize < 18 {
+		fontSize = 18
+	}
+	if fontSize > 48 {
+		fontSize = 48
+	}
+
+	// 每行最大字符数（中文字符宽度 ≈ 字体大小）
+	// 留 10% 安全边距
+	safeWidth := int(float64(width) * 0.9)
+	maxCharsPerLine := safeWidth / fontSize
+	if maxCharsPerLine < 6 {
+		maxCharsPerLine = 6
+	}
+	if maxCharsPerLine > 22 {
+		maxCharsPerLine = 22
+	}
+
+	// 距底部边距（像素）
+	marginV := int(float64(height) * 0.08)
+
+	log.Printf("[Composer] ASS 参数: fontSize=%d, maxCharsPerLine=%d, marginV=%d, video=%dx%d",
+		fontSize, maxCharsPerLine, marginV, width, height)
+
+	// 构建 ASS 文件内容
+	var sb strings.Builder
+
+	// [Script Info]
+	sb.WriteString("[Script Info]\n")
+	sb.WriteString("ScriptType: v4.00+\n")
+	sb.WriteString(fmt.Sprintf("PlayResX: %d\n", width))
+	sb.WriteString(fmt.Sprintf("PlayResY: %d\n", height))
+	sb.WriteString("ScaledBorderAndShadow: yes\n")
+	sb.WriteString("\n")
+
+	// [V4+ Styles]
+	sb.WriteString("[V4+ Styles]\n")
+	sb.WriteString("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+	// 白色字体，黑色描边，底部居中（Alignment=2）
+	sb.WriteString(fmt.Sprintf("Style: Default,Noto Sans SC,%d,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,2,20,20,%d,1\n",
+		fontSize, marginV))
+	sb.WriteString("\n")
+
+	// [Events]
+	sb.WriteString("[Events]\n")
+	sb.WriteString("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+
+	for _, entry := range entries {
+		// 对文本进行换行
+		wrappedLines := wrapLines(entry.Text, maxCharsPerLine)
+		// ASS 用 \N 表示换行
+		assText := strings.Join(wrappedLines, "\\N")
+
+		startASS := formatASSTime(entry.Start)
+		endASS := formatASSTime(entry.End)
+
+		sb.WriteString(fmt.Sprintf("Dialogue: 0,%s,%s,Default,,0,0,0,,%s\n", startASS, endASS, assText))
+	}
+
+	if err := os.WriteFile(assPath, []byte(sb.String()), 0644); err != nil {
+		return fmt.Errorf("写入 ASS 文件失败: %w", err)
+	}
+
+	log.Printf("[Composer] SRT -> ASS 转换完成: %s (%d 条字幕)", assPath, len(entries))
+	return nil
+}
+
+// formatASSTime 将秒数转换为 ASS 时间格式 H:MM:SS.CC
+func formatASSTime(seconds float64) string {
+	h := int(seconds) / 3600
+	m := (int(seconds) % 3600) / 60
+	s := seconds - float64(h*3600+m*60)
+	cs := int((s-float64(int(s)))*100 + 0.5)
+	return fmt.Sprintf("%d:%02d:%02d.%02d", h, m, int(s), cs)
 }
 
 // escapeDrawtextString 转义 drawtext 滤镜中的特殊字符（保留作为备用）
