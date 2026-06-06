@@ -1,0 +1,58 @@
+{{define "task_list"}}
+<table>
+    <thead>
+        <tr>
+            <th>任务 ID</th>
+            <th>主题</th>
+            <th>状态</th>
+            <th>进度</th>
+            <th>视频时长</th>
+            <th>创建时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Tasks}}
+        <tr id="task-{{.ID}}">
+            <td><code>{{slice .ID 0 8}}...</code></td>
+            <td>{{.Params.Subject}}</td>
+            <td>
+                <span class="badge badge-{{.State}}">{{.State}}</span>
+                {{if .Error}}
+                <div class="error-info" style="font-size:0.75rem;margin-top:4px;max-width:200px;word-break:break-all;border-left:3px solid #555;padding-left:6px;">{{.Error}}</div>
+                {{end}}
+            </td>
+            <td>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" style="width:{{.Progress}}%"></div>
+                </div>
+                <small>{{printf "%.0f" .Progress}}%</small>
+            </td>
+            <td>{{formatDuration .VideoDuration}}</td>
+            <td>{{.CreatedAt.Format "01-02 15:04"}}</td>
+            <td>
+                {{if eq (printf "%s" .State) "completed"}}
+                <a href="/api/v1/tasks/{{.ID}}/download" class="btn btn-success" style="padding:4px 8px;font-size:0.75rem;">下载</a>
+                {{else if eq (printf "%s" .State) "failed"}}
+                <span style="font-size:0.75rem;font-weight:700;">FAILED</span>
+                {{else if eq (printf "%s" .State) "cancelled"}}
+                <span style="font-size:0.75rem;">已取消</span>
+                {{else}}
+                <button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem;"
+                        hx-delete="/api/v1/tasks/{{.ID}}"
+                        hx-confirm="确定取消此任务？"
+                        hx-target="closest tr"
+                        hx-swap="outerHTML">取消</button>
+                {{end}}
+            </td>
+        </tr>
+        {{else}}
+        <tr>
+            <td colspan="7" style="text-align:center;padding:32px;">
+                暂无任务
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}

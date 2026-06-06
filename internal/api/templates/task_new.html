@@ -1,0 +1,170 @@
+{{define "content"}}
+<div class="card">
+    <h2>创建视频任务</h2>
+    <form hx-post="/api/v1/tasks"
+          hx-target="#task-result"
+          hx-swap="innerHTML"
+          hx-on::before-request="if(window.__submitting){event.preventDefault();return}window.__submitting=true;document.getElementById('submit-btn').disabled=true;document.getElementById('submit-btn').textContent='提交中...'"
+          hx-on::after-request="window.__submitting=false;document.getElementById('submit-btn').disabled=false;document.getElementById('submit-btn').textContent='提交任务';if(event.detail.successful){document.getElementById('task-result').innerHTML='<div style=\'padding:12px;border:2px solid #555;background:#555;color:#fff\'>TASK SUBMITTED</div>';if(window.htmx)htmx.ajax('GET','/tasks/list','#task-list-container')}else{document.getElementById('task-result').innerHTML='<div style=\'padding:12px;border:2px solid #555;background:#fff;color:#555;font-weight:700\'>SUBMIT FAILED</div>'}">
+
+        <div class="form-group">
+            <label>视频主题 *</label>
+            <div style="display:flex;gap:8px;">
+                <input type="text" name="subject" id="subject-input" placeholder="例如：生命的意义是什么" required style="flex:1;">
+                <button type="button" class="btn btn-primary" id="gen-script-btn"
+                        onclick="generateScript()" style="white-space:nowrap;">
+                    ✨ AI 生成文案
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>视频文案（可手动编辑，留空则自动生成）</label>
+            <textarea name="script" id="script-textarea" rows="6" placeholder="点击「AI 生成文案」自动生成，或直接输入自定义文案"></textarea>
+            <div id="script-status" style="margin-top:4px;font-size:0.8rem;color:#525252;"></div>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>语言</label>
+                <select name="language">
+                    <option value="zh-CN">中文</option>
+                    <option value="en-US">English</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>段落数</label>
+                <select name="paragraph_number">
+                    <option value="3">3 段</option>
+                    <option value="5" selected>5 段</option>
+                    <option value="8">8 段</option>
+                    <option value="10">10 段</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>视频尺寸</label>
+                <select name="aspect">
+                    <option value="9:16">竖屏 9:16 (1080×1920)</option>
+                    <option value="16:9">横屏 16:9 (1920×1080)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>生成数量</label>
+                <select name="video_count">
+                    <option value="1" selected>1 个</option>
+                    <option value="2">2 个</option>
+                    <option value="3">3 个</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>拼接模式</label>
+                <select name="concat_mode">
+                    <option value="random" selected>随机</option>
+                    <option value="sequential">顺序</option>
+                    <option value="reverse">倒序</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>片段时长 (秒)</label>
+                <input type="number" name="clip_duration" value="5" min="2" max="30">
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>语音</label>
+                <select name="voice_name">
+                    <option value="zh-CN-XiaoyiNeural">晓晓 (女)</option>
+                    <option value="zh-CN-YunxiNeural">云希 (男)</option>
+                    <option value="zh-CN-YunjianNeural">云健 (男)</option>
+                    <option value="en-US-JennyNeural">Jenny (女)</option>
+                    <option value="en-US-GuyNeural">Guy (男)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>语速调整</label>
+                <input type="range" name="voice_rate" min="-50" max="100" value="0">
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="subtitle_enabled" checked> 启用字幕
+                </label>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="bgm_enabled" checked> 启用背景音乐
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submit-btn" style="width:100%;padding:12px;font-size:1rem;text-transform:uppercase;letter-spacing:1px;">
+            提交任务
+        </button>
+    </form>
+
+    <div id="task-result" style="margin-top:16px;"></div>
+</div>
+
+<script>
+async function generateScript() {
+    const subject = document.getElementById('subject-input').value.trim();
+    const language = document.querySelector('[name="language"]').value;
+    const paragraphs = parseInt(document.querySelector('[name="paragraph_number"]').value) || 5;
+    const btn = document.getElementById('gen-script-btn');
+    const textarea = document.getElementById('script-textarea');
+    const status = document.getElementById('script-status');
+
+    if (!subject) {
+        status.textContent = '请先输入视频主题';
+        status.style.color = '#555';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    status.textContent = '正在调用 AI 生成文案，请稍候...';
+    status.style.color = '#525252';
+
+    try {
+        const resp = await fetch('/api/v1/llm/generate-script', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({subject, language, paragraph_number: paragraphs})
+        });
+        const data = await resp.json();
+        if (data.error) {
+            status.textContent = 'ERROR: ' + data.error;
+            status.style.color = '#555';
+        } else {
+            textarea.value = data.script;
+            status.textContent = '文案生成完成，可在下方编辑';
+            status.style.color = '#555';
+        }
+    } catch(e) {
+        status.textContent = '请求失败: ' + e.message;
+        status.style.color = '#555';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ AI 生成文案';
+    }
+}
+</script>
+
+<div id="task-list-container">
+    <div class="card">
+        <h2>任务列表</h2>
+        <div hx-get="/tasks/list" hx-trigger="load, every 10s" hx-swap="innerHTML">
+            加载中...
+        </div>
+    </div>
+</div>
+{{end}}

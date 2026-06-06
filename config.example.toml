@@ -1,0 +1,67 @@
+# MoneyPrinterFaster 配置文件
+# 复制本文件为 config.toml 并填写相应配置
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[queue]
+buffer_size = 100          # Channel 缓冲大小
+wal_dir = "./data/wal"     # WAL 存储目录
+
+[worker]
+max_workers = 4            # 最大并发 worker 数
+min_workers = 1            # 最小并发 worker 数
+high_water_mark = 0.85     # CPU 高水位（超过则缩减 worker）
+low_water_mark = 0.50      # CPU 低水位（低于则扩容 worker）
+scale_interval = "5s"      # 扩缩容检查间隔
+cpu_sample_interval = "2s" # CPU 采样间隔
+
+[llm]
+provider = "openai"        # "openai" | "deepseek" | "ollama"
+
+[llm.openai]
+api_key = ""
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
+
+[llm.deepseek]
+api_key = ""
+base_url = "https://api.deepseek.com"
+model = "deepseek-v4-pro"
+enable_thinking = false    # 是否启用 thinking 模式（开启会消耗更多 token 和时间）
+reasoning_effort = "medium" # "low" | "medium" | "high"
+
+[llm.ollama]
+base_url = "http://localhost:11434"
+model = "llama3"
+
+[tts]
+provider = "edge"          # "edge" | "azure" | "openai"
+
+[tts.azure]
+speech_key = ""
+speech_region = "eastus"
+
+[tts.openai]
+api_key = ""
+base_url = "https://api.openai.com/v1"
+model = "tts-1"
+voice = "alloy"
+
+[subtitle]
+provider = "edge"          # "edge" | "whisper" | ""（留空不生成字幕）
+
+[material]
+source = "pexels"          # "pexels" | "pixabay" | "local"
+local_dir = ""             # 本地素材目录（source = "local" 时使用）
+
+[material.pexels]
+api_keys = []
+
+[material.pixabay]
+api_keys = []
+
+[ffmpeg]
+binary_path = ""           # 留空自动检测
+video_codec = "libx264"    # "libx264" | "h264_nvenc" | "h264_videotoolbox" | "h264_qsv"

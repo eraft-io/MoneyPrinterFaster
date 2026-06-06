@@ -1,0 +1,65 @@
+package api
+
+import (
+	"embed"
+	"fmt"
+	"html/template"
+	"math"
+	"net/http"
+)
+
+//go:embed templates/*.html
+var templateFS embed.FS
+
+var templates *template.Template
+
+func init() {
+	funcMap := template.FuncMap{
+		"formatDuration": func(seconds float64) string {
+			if seconds <= 0 {
+				return "-"
+			}
+			totalSec := int(math.Round(seconds))
+			min := totalSec / 60
+			sec := totalSec % 60
+			if min > 0 {
+				return fmt.Sprintf("%d分%02d秒", min, sec)
+			}
+			return fmt.Sprintf("%d秒", sec)
+		},
+	}
+	templates = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html"))
+}
+
+// WebHandler HTMX Web 页面 Handler
+type WebHandler struct {
+	deps *Dependencies
+}
+
+func NewWebHandler(deps *Dependencies) *WebHandler {
+	return &WebHandler{deps: deps}
+}
+
+// IndexPage 首页（创建任务 + 任务列表）
+func (h *WebHandler) IndexPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := templates.ExecuteTemplate(w, "layout", nil); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// TaskList 任务列表片段（HTMX 局部刷新）
+func (h *WebHandler) TaskList(w http.ResponseWriter, r *http.Request) {
+	tasks, _, err := h.deps.Queue.List(0, 50)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := templates.ExecuteTemplate(w, "task_list", map[string]any{
+		"Tasks": tasks,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
