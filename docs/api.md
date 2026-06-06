@@ -154,6 +154,7 @@ curl -s http://localhost:8080/api/v1/tasks?offset=0\&limit=10
       "finished_at": "2026-06-05T10:32:15Z",
       "output_path": "./data/tasks/550e8400/final_1.mp4",
       "video_duration": 62.5,
+      "cost_seconds": 134.2,
       "params": { "subject": "人工智能的未来", "...": "..." }
     },
     {
@@ -171,6 +172,23 @@ curl -s http://localhost:8080/api/v1/tasks?offset=0\&limit=10
   "limit": 10
 }
 ```
+
+**Task 对象字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 任务唯一 ID |
+| `state` | string | 状态：`pending` / `processing` / `completed` / `failed` / `cancelled` |
+| `priority` | int | 优先级：0=高 / 1=普通 / 2=低 |
+| `progress` | float | 进度百分比（0-100） |
+| `created_at` | string | 创建时间（RFC3339） |
+| `started_at` | string\|null | 开始处理时间 |
+| `finished_at` | string\|null | 完成时间 |
+| `output_path` | string | 输出视频文件路径 |
+| `video_duration` | float | 最终视频时长（秒） |
+| `cost_seconds` | float | 生成耗时（秒），从开始处理到完成的总耗时 |
+| `params` | object | 任务参数（见创建任务） |
+| `error` | string | 失败时的错误信息 |
 
 ---
 
@@ -199,6 +217,7 @@ curl -s http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000
   "finished_at": "2026-06-05T10:32:15Z",
   "output_path": "./data/tasks/550e8400/final_1.mp4",
   "video_duration": 62.5,
+  "cost_seconds": 134.2,
   "params": {
     "subject": "人工智能的未来",
     "script": "人工智能正在改变我们的生活方式...",

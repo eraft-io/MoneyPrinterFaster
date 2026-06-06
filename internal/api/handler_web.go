@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -28,6 +29,12 @@ func init() {
 				return fmt.Sprintf("%d分%02d秒", min, sec)
 			}
 			return fmt.Sprintf("%d秒", sec)
+		},
+		"secsBetween": func(start, end *time.Time) float64 {
+			if start == nil || end == nil {
+				return 0
+			}
+			return end.Sub(*start).Seconds()
 		},
 		"newUUID": func() string {
 			return uuid.New().String()

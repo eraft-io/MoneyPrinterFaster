@@ -7,6 +7,7 @@
             <th>状态</th>
             <th>进度</th>
             <th>视频时长</th>
+            <th>耗时</th>
             <th>创建时间</th>
             <th>操作</th>
         </tr>
@@ -29,6 +30,17 @@
                 <small>{{printf "%.0f" .Progress}}%</small>
             </td>
             <td>{{formatDuration .VideoDuration}}</td>
+            <td>
+                {{if .StartedAt}}
+                    {{if .FinishedAt}}
+                        {{formatDuration (secsBetween .StartedAt .FinishedAt)}}
+                    {{else}}
+                        <span style="color:#525252;">进行中...</span>
+                    {{end}}
+                {{else}}
+                    -
+                {{end}}
+            </td>
             <td>{{.CreatedAt.Format "01-02 15:04"}}</td>
             <td>
                 {{if eq (printf "%s" .State) "completed"}}
@@ -48,7 +60,7 @@
         </tr>
         {{else}}
         <tr>
-            <td colspan="7" style="text-align:center;padding:32px;">
+            <td colspan="8" style="text-align:center;padding:32px;">
                 暂无任务
             </td>
         </tr>

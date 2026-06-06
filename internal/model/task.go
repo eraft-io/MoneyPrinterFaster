@@ -2,6 +2,8 @@ package model
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"time"
 )
 
@@ -92,4 +94,50 @@ func (t *Task) Duration() time.Duration {
 		end = *t.FinishedAt
 	}
 	return end.Sub(*t.StartedAt)
+}
+
+// CostSeconds 返回任务消耗的秒数（0 表示未完成或未开始）
+func (t *Task) CostSeconds() float64 {
+	if t.StartedAt == nil {
+		return 0
+	}
+	end := time.Now()
+	if t.FinishedAt != nil {
+		end = *t.FinishedAt
+	}
+	return end.Sub(*t.StartedAt).Seconds()
+}
+
+// taskJSON 用于自定义 JSON 序列化（包含 cost_seconds 计算字段）
+type taskJSON struct {
+	ID            string       `json:"id"`
+	State         TaskState    `json:"state"`
+	Priority      TaskPriority `json:"priority"`
+	Params        VideoParams  `json:"params"`
+	Progress      float64      `json:"progress"`
+	Error         string       `json:"error,omitempty"`
+	CreatedAt     time.Time    `json:"created_at"`
+	StartedAt     *time.Time   `json:"started_at,omitempty"`
+	FinishedAt    *time.Time   `json:"finished_at,omitempty"`
+	OutputPath    string       `json:"output_path,omitempty"`
+	VideoDuration float64      `json:"video_duration,omitempty"`
+	CostSeconds   float64      `json:"cost_seconds,omitempty"`
+}
+
+// MarshalJSON 自定义序列化，自动填充 cost_seconds
+func (t *Task) MarshalJSON() ([]byte, error) {
+	return json.Marshal(taskJSON{
+		ID:            t.ID,
+		State:         t.State,
+		Priority:      t.Priority,
+		Params:        t.Params,
+		Progress:      t.Progress,
+		Error:         t.Error,
+		CreatedAt:     t.CreatedAt,
+		StartedAt:     t.StartedAt,
+		FinishedAt:    t.FinishedAt,
+		OutputPath:    t.OutputPath,
+		VideoDuration: t.VideoDuration,
+		CostSeconds:   math.Round(t.CostSeconds()*10) / 10,
+	})
 }
