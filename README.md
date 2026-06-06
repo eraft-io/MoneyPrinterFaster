@@ -153,3 +153,7 @@ make build-linux
 - **FFmpeg 内存优化**：逐文件标准化 + concat demuxer 流式拼接，避免 OOM
 - **字幕双方案**：优先 libass subtitles 滤镜，降级使用 drawtext
 - **时长精准控制**：ffprobe 探测真实时长，下载素材不超过音频时长的 110%
+
+## REST API
+
+详见 [docs/api.md](docs/api.md)
