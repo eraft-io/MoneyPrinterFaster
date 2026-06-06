@@ -6,6 +6,8 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 //go:embed templates/*.html
@@ -26,6 +28,9 @@ func init() {
 				return fmt.Sprintf("%d分%02d秒", min, sec)
 			}
 			return fmt.Sprintf("%d秒", sec)
+		},
+		"newUUID": func() string {
+			return uuid.New().String()
 		},
 	}
 	templates = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html"))

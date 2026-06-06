@@ -21,27 +21,27 @@ const (
 type VideoTransitionMode string
 
 const (
-	TransitionNone    VideoTransitionMode = "none"
-	TransitionFade    VideoTransitionMode = "fade"
-	TransitionSlide   VideoTransitionMode = "slide"
+	TransitionNone     VideoTransitionMode = "none"
+	TransitionFade     VideoTransitionMode = "fade"
+	TransitionSlide    VideoTransitionMode = "slide"
 	TransitionDissolve VideoTransitionMode = "dissolve"
 )
 
 // VideoParams 视频生成参数
 type VideoParams struct {
 	// 核心输入
-	Subject string `json:"subject"`           // 视频主题
-	Script  string `json:"script,omitempty"`  // 自定义文案（留空则自动生成）
+	Subject string `json:"subject"`          // 视频主题
+	Script  string `json:"script,omitempty"` // 自定义文案（留空则自动生成）
 
 	// 语言与风格
-	Language        string `json:"language"`          // 语言：zh-CN / en-US
-	ParagraphNumber int    `json:"paragraph_number"`  // 文案段落数（1-10）
+	Language        string `json:"language"`         // 语言：zh-CN / en-US
+	ParagraphNumber int    `json:"paragraph_number"` // 文案段落数（1-10）
 
 	// 视频规格
-	Aspect          VideoAspect     `json:"aspect"`           // 竖屏/横屏
-	ConcatMode      VideoConcatMode `json:"concat_mode"`      // 拼接模式
-	TransitionMode  VideoTransitionMode `json:"transition_mode"` // 转场模式
-	ClipDuration    int             `json:"clip_duration"`    // 单片段时长（秒）
+	Aspect         VideoAspect         `json:"aspect"`          // 竖屏/横屏
+	ConcatMode     VideoConcatMode     `json:"concat_mode"`     // 拼接模式
+	TransitionMode VideoTransitionMode `json:"transition_mode"` // 转场模式
+	ClipDuration   int                 `json:"clip_duration"`   // 单片段时长（秒）
 
 	// 批量
 	VideoCount int `json:"video_count"` // 生成视频数量
@@ -64,7 +64,7 @@ type VideoParams struct {
 	BGMVolume  float64 `json:"bgm_volume"`         // BGM 音量（0.0-1.0）
 
 	// 素材来源覆盖（空则使用全局配置）
-	MaterialSource string `json:"material_source,omitempty"`
+	MaterialSource   string `json:"material_source,omitempty"`
 	LocalMaterialDir string `json:"local_material_dir,omitempty"`
 }
 

@@ -4,40 +4,70 @@
 
 ## 架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        HTTP / WebSocket                      │
-│                    (chi router + HTMX 前端)                   │
-└─────────────┬───────────────────────────────────┬────────────┘
-              │ 提交任务                            │ 进度推送
-              ▼                                     ▼
-┌─────────────────────────┐            ┌──────────────────────┐
-│      Task Handler       │            │   WebSocket Hub      │
-│   (校验 → 入队 → 响应)   │            │  (实时广播任务状态)    │
-└─────────────┬───────────┘            └──────────────────────┘
-              │                                         ▲
-              ▼                                         │
-┌─────────────────────────┐            ┌──────────────────────┐
-│     Channel Queue       │            │    CPU Monitor       │
-│  (WAL 持久化任务队列)     │            │  (gopsutil 采样)     │
-└─────────────┬───────────┘            └──────────┬───────────┘
-              │                                    │
-              ▼                                    ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Worker Pool                              │
-│              (CPU 自适应扩缩容, Min~Max Workers)               │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Pipeline (5 步)                         │
-│                                                             │
-│  Step 1: LLM       → 根据主题生成视频文案 (DeepSeek/OpenAI)   │
-│  Step 2: TTS       → 文案转语音 (Edge-TTS)                   │
-│  Step 3: Subtitle  → 生成 SRT 字幕 (Edge VTT → SRT)          │
-│  Step 4: Material  → 下载视频素材 (Pexels API)                │
-│  Step 5: Compose   → FFmpeg 拼接 + 音频 + 字幕 → MP4          │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Frontend
+        Web[HTMX Web UI embed]
+    end
+
+    subgraph APILayer[HTTP API]
+        Router[chi Router]
+        WS[WebSocket Hub 进度推送]
+    end
+
+    subgraph TaskDispatch[Task Dispatcher]
+        Queue[内存 Channel 缓冲]
+        Store[SQLite 持久化]
+    end
+
+    subgraph WorkerPool[CPU-Adaptive Worker Pool]
+        Monitor[CPU 监控 2s 采样]
+        Scaler[自动扩缩容]
+        W1[Worker]
+        W2[Worker]
+        W3[Worker]
+        WN[Worker N...]
+    end
+
+    subgraph Pipeline[Pipeline Engine]
+        LLM[LLM 文案生成]
+        TTS[TTS 语音合成]
+        Sub[Subtitle 字幕生成]
+        Mat[Material 素材下载]
+        Comp[Compose 音视频合成]
+    end
+
+    subgraph External[External Services]
+        E1[OpenAI / DeepSeek / Ollama]
+        E2[Edge-TTS / Azure / OpenAI]
+        E3[Pexels / Pixabay / Local]
+        E4[Edge-TTS / Whisper]
+        E5[FFmpeg 本地二进制]
+    end
+
+    Web --> Router
+    WS --> Router
+    Router --> Queue
+    Queue --> Store
+    Queue --> W1
+    Queue --> W2
+    Queue --> W3
+    Queue --> WN
+    Monitor --> Scaler
+    Scaler --> WorkerPool
+    W1 --> LLM
+    W2 --> LLM
+    W3 --> LLM
+    WN --> LLM
+    LLM --> TTS
+    TTS --> Sub
+    Sub --> Mat
+    Mat --> Comp
+    Comp --> E5
+    LLM --> E1
+    TTS --> E2
+    Sub --> E4
+    Mat --> E3
 ```
 
 ## 目录结构
@@ -50,7 +80,7 @@ MoneyPrinterFaster/
 │   ├── config/          # TOML 配置加载
 │   ├── model/           # 数据模型（Task、Params、VideoParams）
 │   ├── pipeline/        # 5 步流水线编排
-│   ├── queue/           # Channel 队列 + WAL 持久化
+│   ├── queue/           # Channel 队列 + SQLite 持久化
 │   ├── service/         # 外部服务集成
 │   │   ├── compose/     # FFmpeg 视频合成
 │   │   ├── llm/         # LLM 文案生成（OpenAI/DeepSeek/Ollama）
@@ -114,7 +144,7 @@ make build-linux
 ## 核心特性
 
 - **CPU 自适应 Worker Pool**：根据 CPU 负载自动扩缩容，不会过载
-- **WAL 持久化队列**：服务重启不丢失任务
+- **SQLite 持久化队列**：服务重启不丢失任务，支持历史任务查询
 - **FFmpeg 内存优化**：逐文件标准化 + concat demuxer 流式拼接，避免 OOM
 - **字幕双方案**：优先 libass subtitles 滤镜，降级使用 drawtext
 - **时长精准控制**：ffprobe 探测真实时长，下载素材不超过音频时长的 110%

@@ -25,7 +25,7 @@ type ServerConfig struct {
 
 type QueueConfig struct {
 	BufferSize int    `toml:"buffer_size"`
-	WALDir     string `toml:"wal_dir"`
+	DBPath     string `toml:"db_path"`
 }
 
 type WorkerConfig struct {
@@ -143,7 +143,7 @@ func defaultConfig() *Config {
 		},
 		Queue: QueueConfig{
 			BufferSize: 100,
-			WALDir:     "./data/wal",
+			DBPath:     "./data/queue.db",
 		},
 		Worker: WorkerConfig{
 			MaxWorkers:        4,
@@ -195,8 +195,8 @@ func applyDefaults(cfg *Config) {
 	if cfg.Queue.BufferSize == 0 {
 		cfg.Queue.BufferSize = def.Queue.BufferSize
 	}
-	if cfg.Queue.WALDir == "" {
-		cfg.Queue.WALDir = def.Queue.WALDir
+	if cfg.Queue.DBPath == "" {
+		cfg.Queue.DBPath = def.Queue.DBPath
 	}
 	if cfg.Worker.MaxWorkers == 0 {
 		cfg.Worker.MaxWorkers = def.Worker.MaxWorkers

@@ -33,6 +33,9 @@ config.toml
 
 # Data (runtime generated)
 data/
+*.db
+*.db-wal
+*.db-shm
 
 # Qoder cache
 .qoder/
@@ -41,3 +44,4 @@ data/
 .env
 .env.local
 server
+build/

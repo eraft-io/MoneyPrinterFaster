@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -14,11 +16,16 @@ import (
 
 // TaskHandler 任务 API Handler
 type TaskHandler struct {
-	deps *Dependencies
+	deps      *Dependencies
+	tokenMu   sync.Mutex
+	usedToken map[string]time.Time // client_token -> 使用时间
 }
 
 func NewTaskHandler(deps *Dependencies) *TaskHandler {
-	return &TaskHandler{deps: deps}
+	return &TaskHandler{
+		deps:      deps,
+		usedToken: make(map[string]time.Time),
+	}
 }
 
 // CreateTask 创建任务
@@ -90,6 +97,17 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		req.BGMEnabled = r.FormValue("bgm_enabled") == "on"
 	}
 
+	// 设置默认值
+	if req.ParagraphNumber <= 0 {
+		req.ParagraphNumber = 5
+	}
+	if req.VideoCount <= 0 {
+		req.VideoCount = 1
+	}
+	if req.ClipDuration <= 0 {
+		req.ClipDuration = 5
+	}
+
 	log.Printf("[Task] 任务参数: subject=%q, script_len=%d, language=%s, paragraphs=%d, aspect=%s",
 		req.Subject, len(req.Script), req.Language, req.ParagraphNumber, req.Aspect)
 
@@ -97,6 +115,31 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "必须提供 subject 或 script")
 		return
 	}
+
+	// client_token 幂等校验：同一个 token 不允许重复提交
+	clientToken := r.FormValue("client_token")
+	if clientToken == "" {
+		clientToken = r.Header.Get("X-Client-Token") // JSON 请求时从 header 取
+	}
+	if clientToken == "" {
+		writeError(w, http.StatusBadRequest, "缺少 client_token，请刷新页面重试")
+		return
+	}
+	log.Printf("[Task] client_token=%s, subject=%q, script_len=%d", clientToken[:min(8, len(clientToken))], req.Subject, len(req.Script))
+	h.tokenMu.Lock()
+	if _, exists := h.usedToken[clientToken]; exists {
+		h.tokenMu.Unlock()
+		writeError(w, http.StatusConflict, "重复提交，请勿频繁点击")
+		return
+	}
+	h.usedToken[clientToken] = time.Now()
+	// 清理 60 秒前的过期记录，防止内存泄漏
+	for tk, t := range h.usedToken {
+		if time.Since(t) > 60*time.Second {
+			delete(h.usedToken, tk)
+		}
+	}
+	h.tokenMu.Unlock()
 
 	// 检查素材服务是否已配置
 	if !h.deps.MaterialReady {

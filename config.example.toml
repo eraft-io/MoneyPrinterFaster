@@ -7,7 +7,7 @@ port = 8080
 
 [queue]
 buffer_size = 100          # Channel 缓冲大小
-wal_dir = "./data/wal"     # WAL 存储目录
+db_path = "./data/queue.db" # SQLite 数据库路径
 
 [worker]
 max_workers = 4            # 最大并发 worker 数

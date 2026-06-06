@@ -6,8 +6,8 @@ import "time"
 type ProgressEvent struct {
 	TaskID    string    `json:"task_id"`
 	State     TaskState `json:"state"`
-	Progress  float64   `json:"progress"`  // 0-100
-	Step      string    `json:"step"`      // 当前步骤名称
+	Progress  float64   `json:"progress"` // 0-100
+	Step      string    `json:"step"`     // 当前步骤名称
 	Message   string    `json:"message"`
 	Timestamp time.Time `json:"timestamp"`
 	Error     string    `json:"error,omitempty"`

@@ -1,11 +1,35 @@
 {{define "content"}}
 <div class="card">
     <h2>创建视频任务</h2>
-    <form hx-post="/api/v1/tasks"
+    <form id="task-form" hx-post="/api/v1/tasks"
           hx-target="#task-result"
-          hx-swap="innerHTML"
-          hx-on::before-request="if(window.__submitting){event.preventDefault();return}window.__submitting=true;document.getElementById('submit-btn').disabled=true;document.getElementById('submit-btn').textContent='提交中...'"
-          hx-on::after-request="window.__submitting=false;document.getElementById('submit-btn').disabled=false;document.getElementById('submit-btn').textContent='提交任务';if(event.detail.successful){document.getElementById('task-result').innerHTML='<div style=\'padding:12px;border:2px solid #555;background:#555;color:#fff\'>TASK SUBMITTED</div>';if(window.htmx)htmx.ajax('GET','/tasks/list','#task-list-container')}else{document.getElementById('task-result').innerHTML='<div style=\'padding:12px;border:2px solid #555;background:#fff;color:#555;font-weight:700\'>SUBMIT FAILED</div>'}">
+          hx-swap="innerHTML">
+        <input type="hidden" name="client_token" id="client-token" value="{{newUUID}}">
+
+<script>
+document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.target.id !== 'task-form') return;
+    var result = document.getElementById('task-result');
+    if (evt.detail.successful) {
+        result.innerHTML = '<div style="padding:12px;border:2px solid #555;background:#555;color:#fff">TASK SUBMITTED</div>';
+        if (window.htmx) htmx.ajax('GET', '/tasks/list', '#task-list-container');
+    } else {
+        var msg = 'SUBMIT FAILED';
+        try {
+            var resp = JSON.parse(evt.detail.xhr.responseText);
+            if (resp.error) msg = resp.error;
+        } catch(e) {}
+        result.innerHTML = '<div style="padding:12px;border:2px solid #555;background:#fff;color:#555;font-weight:700">' + msg + '</div>';
+    }
+    // 请求完成后刷新 token，允许用户再次提交
+    try {
+        document.getElementById('client-token').value = crypto.randomUUID();
+    } catch(e) {
+        // 降级：浏览器不支持 crypto.randomUUID 时用时间戳+随机数
+        document.getElementById('client-token').value = Date.now() + '-' + Math.random().toString(36).slice(2);
+    }
+});
+</script>
 
         <div class="form-group">
             <label>视频主题 *</label>
@@ -33,46 +57,11 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>段落数</label>
-                <select name="paragraph_number">
-                    <option value="3">3 段</option>
-                    <option value="5" selected>5 段</option>
-                    <option value="8">8 段</option>
-                    <option value="10">10 段</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="grid-2">
-            <div class="form-group">
                 <label>视频尺寸</label>
                 <select name="aspect">
                     <option value="9:16">竖屏 9:16 (1080×1920)</option>
                     <option value="16:9">横屏 16:9 (1920×1080)</option>
                 </select>
-            </div>
-            <div class="form-group">
-                <label>生成数量</label>
-                <select name="video_count">
-                    <option value="1" selected>1 个</option>
-                    <option value="2">2 个</option>
-                    <option value="3">3 个</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="grid-2">
-            <div class="form-group">
-                <label>拼接模式</label>
-                <select name="concat_mode">
-                    <option value="random" selected>随机</option>
-                    <option value="sequential">顺序</option>
-                    <option value="reverse">倒序</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>片段时长 (秒)</label>
-                <input type="number" name="clip_duration" value="5" min="2" max="30">
             </div>
         </div>
 
@@ -83,8 +72,6 @@
                     <option value="zh-CN-XiaoyiNeural">晓晓 (女)</option>
                     <option value="zh-CN-YunxiNeural">云希 (男)</option>
                     <option value="zh-CN-YunjianNeural">云健 (男)</option>
-                    <option value="en-US-JennyNeural">Jenny (女)</option>
-                    <option value="en-US-GuyNeural">Guy (男)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -93,20 +80,15 @@
             </div>
         </div>
 
-        <div class="grid-2">
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="subtitle_enabled" checked> 启用字幕
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="bgm_enabled" checked> 启用背景音乐
-                </label>
-            </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="subtitle_enabled" checked> 启用字幕
+            </label>
         </div>
 
-        <button type="submit" class="btn btn-primary" id="submit-btn" style="width:100%;padding:12px;font-size:1rem;text-transform:uppercase;letter-spacing:1px;">
+        <input type="hidden" name="bgm_enabled" value="on">
+
+        <button type="submit" class="btn btn-danger" id="submit-btn" style="width:100%;padding:12px;font-size:1rem;text-transform:uppercase;letter-spacing:1px;">
             提交任务
         </button>
     </form>
@@ -118,7 +100,7 @@
 async function generateScript() {
     const subject = document.getElementById('subject-input').value.trim();
     const language = document.querySelector('[name="language"]').value;
-    const paragraphs = parseInt(document.querySelector('[name="paragraph_number"]').value) || 5;
+    const paragraphs = 5;
     const btn = document.getElementById('gen-script-btn');
     const textarea = document.getElementById('script-textarea');
     const status = document.getElementById('script-status');
