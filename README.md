@@ -4,71 +4,76 @@
 
 ## 架构
 
-```mermaid
-graph TB
-    subgraph Frontend
-        Web[HTMX Web UI embed]
-    end
-
-    subgraph APILayer[HTTP API]
-        Router[chi Router]
-        WS[WebSocket Hub 进度推送]
-    end
-
-    subgraph TaskDispatch[Task Dispatcher]
-        Queue[内存 Channel 缓冲]
-        Store[SQLite 持久化]
-    end
-
-    subgraph WorkerPool[CPU-Adaptive Worker Pool]
-        Monitor[CPU 监控 2s 采样]
-        Scaler[自动扩缩容]
-        W1[Worker]
-        W2[Worker]
-        W3[Worker]
-        WN[Worker N...]
-    end
-
-    subgraph Pipeline[Pipeline Engine]
-        LLM[LLM 文案生成]
-        TTS[TTS 语音合成]
-        Sub[Subtitle 字幕生成]
-        Mat[Material 素材下载]
-        Comp[Compose 音视频合成]
-    end
-
-    subgraph External[External Services]
-        E1[OpenAI / DeepSeek / Ollama]
-        E2[Edge-TTS / Azure / OpenAI]
-        E3[Pexels / Pixabay / Local]
-        E4[Edge-TTS / Whisper]
-        E5[FFmpeg 本地二进制]
-    end
-
-    Web --> Router
-    WS --> Router
-    Router --> Queue
-    Queue --> Store
-    Queue --> W1
-    Queue --> W2
-    Queue --> W3
-    Queue --> WN
-    Monitor --> Scaler
-    Scaler --> WorkerPool
-    W1 --> LLM
-    W2 --> LLM
-    W3 --> LLM
-    WN --> LLM
-    LLM --> TTS
-    TTS --> Sub
-    Sub --> Mat
-    Mat --> Comp
-    Comp --> E5
-    LLM --> E1
-    TTS --> E2
-    Sub --> E4
-    Mat --> E3
 ```
++---------------------------------------------------------------+
+|                     MoneyPrinterFaster                        |
+|                                                               |
+|   +----------+   +------------+   +------------------------+  |
+|   | HTMX Web |   | REST API   |   | WebSocket (进度推送)    |  |
+|   | (embed)  |   | (net/http) |   |                        |  |
+|   +----+-----+   +-----+------+   +----------+-------------+  |
+|        |               |                     |                |
+|   +----v---------------v---------------------v------------+   |
+|   |                 Router (chi)                            |   |
+|   +--------------------------------------------------------+  |
+|                            |                                  |
+|   +------------------------v------------------------------+   |
+|   |                Task Dispatcher                         |   |
+|   |  - SQLite 持久化                                       |   |
+|   |  - 内存 Channel 缓冲                                   |   |
+|   |  - 优先级 / 取消 / 重试                                |   |
+|   +-------------------------------------------------------+   |
+|                            |                                  |
+|   +------------------------v------------------------------+   |
+|   |            CPU-Adaptive Worker Pool                    |   |
+|   |  - 定时采样 CPU 负载 (2s 间隔)                         |   |
+|   |  - 动态调整活跃 worker 数                               |   |
+|   |  - 负载高时缩减并发，空闲时扩到上限                     |   |
+|   +----+--------+--------+--------+--------+---------+---+   |
+|        |        |        |        |        |         |       |
+|   +----v--+ +---v--+ +---v--+ +---v--+ +---v--+ +---v--+    |
+|   |Worker| |Worker| |Worker| |Worker| |Worker| |Worker|     |
+|   +---+---+ +---+--+ +---+--+ +---+--+ +---+--+ +---+--+    |
+|       |         |        |        |        |        |        |
+|   +---v---------v--------v--------v--------v--------v----+   |
+|   |               Pipeline Engine                         |   |
+|   |                                                       |   |
+|   | [LLM] -> [TTS] -> [Subtitle] -> [Material] -> [Compose]|  |
+|   |                                                       |   |
+|   | 每个 Step 是独立接口，可替换实现                        |   |
+|   +------------------------------------------------------+   |
+|                                                               |
+|   +------------------------------------------------------+   |
+|   |              External Services                         |   |
+|   |  LLM (OpenAI / DeepSeek / Ollama)                     |   |
+|   |  TTS (Edge-TTS / Azure / OpenAI)                      |   |
+|   |  Material (Pexels / Pixabay / Local)                   |   |
+|   |  Subtitle (Edge-TTS / Whisper)                        |   |
+|   |  FFmpeg (本地二进制调用)                                |   |
+|   +------------------------------------------------------+   |
++---------------------------------------------------------------+
+```
+
+## WebUI
+
+基于 HTMX + Go embed 构建的极简黑白直角 Web 界面，零前端框架依赖，单文件部署。
+
+![WebUI](images/webui.png)
+
+**功能一览：**
+
+- **视频主题 + AI 生成文案** — 输入主题一键调用 LLM 生成视频脚本，也可手动编辑
+- **参数配置** — 语言（中/英）、视频尺寸（9:16 竖屏 / 16:9 横屏）、语音（晓晓/云希/云健）、语速滑块调节
+- **字幕 & 背景音乐** — 默认启用字幕和 BGM，无需额外配置
+- **任务提交** — client_token 幂等校验，防止重复提交
+- **任务列表** — 实时轮询 + WebSocket 进度推送，显示状态、进度条、当前步骤、错误信息、视频时长、下载链接
+- **系统状态栏** — 顶部实时显示队列中 / 处理中 / 已完成任务数
+
+**设计特点：**
+
+- 黑白极简风格，直角边框（`border-radius: 0`），hover 反色
+- HTMX 驱动，无 SPA 框架，页面切换零延迟
+- CSS 变量主题，全局 `var(--black) / var(--white)` 统一色调
 
 ## 目录结构
 
