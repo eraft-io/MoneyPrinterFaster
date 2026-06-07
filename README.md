@@ -49,7 +49,7 @@
 |   |              External Services                         |   |
 |   |  LLM (OpenAI / DeepSeek / Ollama)                     |   |
 |   |  TTS (Edge-TTS / Azure / OpenAI)                      |   |
-|   |  Material (Pexels / Pixabay / Local)                   |   |
+|   |  Material (Pexels / Pixabay / Local / AliyunImage) |   |
 |   |  Subtitle (Edge-TTS / Whisper)                        |   |
 |   |  FFmpeg (本地二进制调用)                                |   |
 |   +------------------------------------------------------+   |
@@ -61,6 +61,15 @@
 基于 HTMX + Go embed 构建的极简黑白直角 Web 界面，零前端框架依赖，单文件部署。
 
 ![WebUI](images/webui.png)
+
+## Demo 演示
+
+以下视频均为系统自动生成，无任何人工剪辑：
+
+| 素材来源 | 演示视频 |
+|----------|----------|
+| 人类为什么要探索宇宙 |  http://xhslink.com/o/2hP8Yp1x07g | 
+| 阅读的意义 |  http://xhslink.com/o/3xoZeJm0bUc |
 
 ## 目录结构
 
@@ -76,13 +85,14 @@ MoneyPrinterFaster/
 │   ├── service/         # 外部服务集成
 │   │   ├── compose/     # FFmpeg 视频合成
 │   │   ├── llm/         # LLM 文案生成（OpenAI/DeepSeek/Ollama）
-│   │   ├── material/    # 素材下载（Pexels/Pixabay）
+│   │   ├── material/    # 素材下载（Pexels/AliyunImage/Pixabay）
 │   │   ├── subtitle/    # 字幕生成（Edge/Whisper）
 │   │   └── tts/         # 语音合成（Edge/Azure/OpenAI）
 │   └── worker/          # CPU 自适应 Worker Pool
 ├── pkg/utils/           # 通用工具（文件、FFmpeg 路径检测）
 ├── web/                 # 静态资源 + 前端
 ├── config.example.toml  # 配置模板
+├── vedios/              # 演示视频
 └── Makefile             # 构建脚本
 ```
 
@@ -105,7 +115,8 @@ cp config.example.toml config.toml
 | 配置项 | 说明 | 必填 |
 |--------|------|------|
 | `[llm.deepseek].api_key` | DeepSeek API Key | 是（至少配一个 LLM） |
-| `[material.pexels].api_keys` | Pexels API Key 列表 | 是（至少一个） |
+| `[material.pexels].api_keys` | Pexels API Key 列表（搜索视频素材） | 是（至少一个素材来源） |
+| `[material.aliyun_image].api_key` | 阿里云百炼 API Key（AI 文生图） | 否（二选一即可） |
 | `[tts]` | TTS 引擎（默认 edge，无需 Key） | 否 |
 
 ### 运行
@@ -129,12 +140,23 @@ make build-linux
 
 1. 输入视频主题（如"人工智能的未来"）
 2. 点击「AI 生成文案」自动生成脚本，或手动填写
-3. 调整参数（语言、段落数、视频尺寸、语音等）
-4. 点击「提交任务」
-5. 任务列表中查看进度，完成后下载 MP4
+3. 选择素材来源：**搜索视频素材**（Pexels）或 **AI 生成图片**（Z-Image）
+4. 调整参数（语言、视频尺寸、语音等）
+5. 点击「提交任务」
+6. 任务列表中查看进度，完成后下载 MP4
+
+### 素材来源
+
+| 来源 | 说明 | 费用 |
+|------|------|------|
+| **搜索视频素材 (Pexels)** | 根据关键词自动搜索免版权视频素材 | 免费 |
+| **AI 生成图片 (Z-Image)** | 阿里云百炼文生图，根据主题生成 AI 图片，Ken Burns 缓慢缩放效果转视频 | $0.015/张 |
 
 ## 核心特性
 
+- **多素材来源**：支持 Pexels 视频搜索 / 阿里云百炼 Z-Image 文生图，任务级别可选
+- **AI 图片转视频**：Z-Image 生成的图片通过 Ken Burns 缩放效果自动转为视频片段
+- **费用实时预估**：选择 AI 生成图片时，前端根据文案实时估算图片数量和费用
 - **CPU 自适应 Worker Pool**：根据 CPU 负载自动扩缩容，不会过载
 - **SQLite 持久化队列**：服务重启不丢失任务，支持历史任务查询
 - **FFmpeg 内存优化**：逐文件标准化 + concat demuxer 流式拼接，避免 OOM

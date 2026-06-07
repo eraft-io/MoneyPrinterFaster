@@ -20,7 +20,7 @@
             <td>
                 <span class="badge badge-{{.State}}">{{.State}}</span>
                 {{if .Error}}
-                <div class="error-info" style="font-size:0.75rem;margin-top:4px;max-width:200px;word-break:break-all;border-left:3px solid #555;padding-left:6px;">{{.Error}}</div>
+                <div class="error-info" style="font-size:0.75rem;margin-top:4px;max-width:200px;word-break:break-all;border-left:3px solid #000;padding-left:6px;">{{.Error}}</div>
                 {{end}}
             </td>
             <td>
@@ -35,7 +35,7 @@
                     {{if .FinishedAt}}
                         {{formatDuration (secsBetween .StartedAt .FinishedAt)}}
                     {{else}}
-                        <span style="color:#525252;">进行中...</span>
+                        <span style="color:#000;">进行中...</span>
                     {{end}}
                 {{else}}
                     -

@@ -124,7 +124,13 @@ func main() {
 		},
 	}
 
-	for name, src := range sources {
+	// 按固定顺序初始化素材来源（搜索素材在前，AI 生成在后）
+	sourceOrder := []string{"pexels", "pixabay", "local", "aliyun_image"}
+	for _, name := range sourceOrder {
+		src, ok := sources[name]
+		if !ok {
+			continue
+		}
 		if src.check() {
 			p, err := src.create()
 			if err != nil {

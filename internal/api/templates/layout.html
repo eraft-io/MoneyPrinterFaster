@@ -8,12 +8,8 @@
     <script src="/static/htmx.min.js" defer></script>
     <style>
         :root {
-            --black: #555555;
+            --black: #000000;
             --white: #ffffff;
-            --gray-100: #f5f5f5;
-            --gray-200: #e5e5e5;
-            --gray-400: #a3a3a3;
-            --gray-600: #525252;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -78,9 +74,9 @@
         .progress-bar {
             width: 100%;
             height: 8px;
-            background: var(--gray-200);
+            background: var(--white);
             border-radius: 0;
-            border: 1px solid var(--black);
+            border: 2px solid var(--black);
             overflow: hidden;
         }
         .progress-bar-fill {
@@ -101,12 +97,12 @@
         .badge-processing { background: var(--black); color: var(--white); border: 1px solid var(--black); }
         .badge-completed { background: var(--black); color: var(--white); border: 1px solid var(--black); }
         .badge-failed { background: var(--white); color: var(--black); border: 2px solid var(--black); font-weight: 900; }
-        .badge-cancelled { background: var(--gray-200); color: var(--black); border: 1px solid var(--gray-400); }
+        .badge-cancelled { background: var(--white); color: var(--black); border: 1px solid var(--black); }
         table { width: 100%; border-collapse: collapse; }
         th, td {
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid var(--gray-200);
+            border-bottom: 1px solid var(--black);
         }
         th {
             font-weight: 700;
@@ -133,7 +129,7 @@
             -webkit-appearance: none;
             appearance: none;
             height: 4px;
-            background: var(--gray-200);
+            background: var(--white);
             border: none;
             border-radius: 0;
             padding: 0;
@@ -188,7 +184,7 @@
         select {
             -webkit-appearance: none;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23555' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23000' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             padding-right: 32px;
@@ -215,13 +211,13 @@
             display: flex;
             gap: 16px;
             font-size: 0.8rem;
-            color: var(--gray-400);
+            color: var(--white);
             font-weight: 600;
         }
         code {
-            background: var(--gray-100);
+            background: var(--white);
             padding: 2px 6px;
-            border: 1px solid var(--gray-200);
+            border: 1px solid var(--black);
             font-family: monospace;
             font-size: 0.8em;
         }
@@ -264,7 +260,7 @@
                     if (!errDiv) {
                         errDiv = document.createElement('div');
                         errDiv.className = 'error-info';
-                        errDiv.style.cssText = 'font-size:0.75rem;margin-top:4px;max-width:200px;word-break:break-all;border-left:3px solid #555;padding-left:6px;';
+                        errDiv.style.cssText = 'font-size:0.75rem;margin-top:4px;max-width:200px;word-break:break-all;border-left:3px solid #000;padding-left:6px;';
                         badge.parentNode.appendChild(errDiv);
                     }
                     errDiv.textContent = data.message;
