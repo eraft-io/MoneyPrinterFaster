@@ -37,6 +37,11 @@ func NewProvider(cfg *config.MaterialConfig) (Provider, error) {
 			return nil, fmt.Errorf("Pixabay API Key 未配置")
 		}
 		return NewPixabay(cfg.Pixabay.APIKeys), nil
+	case "aliyun_image":
+		if cfg.AliyunImage.APIKey == "" {
+			return nil, fmt.Errorf("阿里云百炼 API Key 未配置，请在 [material.aliyun_image] 中配置 api_key")
+		}
+		return NewAliyunImage(cfg.AliyunImage.APIKey, cfg.AliyunImage.Model, cfg.AliyunImage.ImageCount, cfg.AliyunImage.ClipSeconds), nil
 	case "local":
 		return NewLocal(cfg.LocalDir), nil
 	default:

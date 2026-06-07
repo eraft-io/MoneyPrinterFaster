@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"moneyprinterFaster/assets/fonts"
-	"moneyprinterFaster/internal/model"
 	"moneyprinterFaster/internal/pipeline"
 	"moneyprinterFaster/pkg/utils"
 )
@@ -114,38 +113,46 @@ func (c *Composer) Compose(ctx context.Context, opts pipeline.ComposeOpts) (pipe
 		return pipeline.ComposeResult{}, fmt.Errorf("创建任务目录失败: %w", err)
 	}
 
-	log.Printf("[Composer] 开始合成: video_paths=%d, audio=%s, subtitle=%s, bgm=%s",
-		len(opts.VideoPaths), opts.AudioPath, opts.SubtitlePath, opts.BGMPath)
+	log.Printf("[Composer] 开始合成: video_paths=%d, audio=%s, subtitle=%s, bgm=%s, image_mode=%v",
+		len(opts.VideoPaths), opts.AudioPath, opts.SubtitlePath, opts.BGMPath, opts.IsImageMode)
 
 	// 探测音频时长
 	audioDuration := c.probeDuration(opts.AudioPath)
 	log.Printf("[Composer] 音频时长: %.1fs (%s)", audioDuration, opts.AudioPath)
 
-	// 探测视频时长，并只选取覆盖音频时长的片段
-	var totalVideoDuration float64
+	// 图片模式或视频模式选择素材
 	var selectedPaths []string
-	for _, vp := range opts.VideoPaths {
-		dur := c.probeDuration(vp)
-		log.Printf("[Composer]   视频: %s (duration=%.1fs)", vp, dur)
-		if totalVideoDuration < audioDuration*1.05 { // 选到刚好覆盖音频 + 5% 余量
-			selectedPaths = append(selectedPaths, vp)
-			totalVideoDuration += dur
+	if opts.IsImageMode {
+		// 图片模式：直接使用所有图片，每张图展示 ClipSeconds 秒
+		selectedPaths = opts.VideoPaths
+		log.Printf("[Composer] 图片模式: %d 张图片 × %ds = %.1fs (音频 %.1fs)",
+			len(selectedPaths), opts.ClipSeconds, float64(len(selectedPaths)*opts.ClipSeconds), audioDuration)
+	} else {
+		// 视频模式：探测时长，选取覆盖音频时长的片段
+		var totalVideoDuration float64
+		for _, vp := range opts.VideoPaths {
+			dur := c.probeDuration(vp)
+			log.Printf("[Composer]   视频: %s (duration=%.1fs)", vp, dur)
+			if totalVideoDuration < audioDuration*1.05 { // 选到刚好覆盖音频 + 5% 余量
+				selectedPaths = append(selectedPaths, vp)
+				totalVideoDuration += dur
+			}
 		}
+		log.Printf("[Composer] 筛选视频: %d/%d 个, 总时长 %.1fs (音频 %.1fs)",
+			len(selectedPaths), len(opts.VideoPaths), totalVideoDuration, audioDuration)
 	}
-	log.Printf("[Composer] 筛选视频: %d/%d 个, 总时长 %.1fs (音频 %.1fs)",
-		len(selectedPaths), len(opts.VideoPaths), totalVideoDuration, audioDuration)
 
 	if len(selectedPaths) == 0 {
-		return pipeline.ComposeResult{}, fmt.Errorf("没有可用的视频素材")
+		return pipeline.ComposeResult{}, fmt.Errorf("没有可用的素材")
 	}
 
 	// 输出路径
 	outputFile := filepath.Join(taskDir, fmt.Sprintf("final-%d.mp4", opts.OutputIndex))
 
-	// 第一步：拼接视频片段
+	// 第一步：拼接素材片段
 	concatFile := filepath.Join(taskDir, fmt.Sprintf("combined-%d.mp4", opts.OutputIndex))
-	log.Printf("[Composer] 第一步: 拼接 %d 个视频片段...", len(selectedPaths))
-	if err := c.concatVideos(ctx, selectedPaths, concatFile, opts.Params); err != nil {
+	log.Printf("[Composer] 第一步: 拼接 %d 个片段...", len(selectedPaths))
+	if err := c.concatVideos(ctx, selectedPaths, concatFile, opts); err != nil {
 		return pipeline.ComposeResult{}, fmt.Errorf("视频拼接失败: %w", err)
 	}
 	concatDuration := c.probeDuration(concatFile)
@@ -169,36 +176,47 @@ func (c *Composer) Compose(ctx context.Context, opts pipeline.ComposeOpts) (pipe
 	}, nil
 }
 
-// concatVideos 拼接视频片段
-// 策略：先逐个标准化每个视频（每次只处理 1 个），然后用 concat demuxer 流式拼接（内存占用极低）
-func (c *Composer) concatVideos(ctx context.Context, inputs []string, output string, params model.VideoParams) error {
+// concatVideos 拼接素材片段
+// 策略：先逐个标准化每个素材（每次只处理 1 个），然后用 concat demuxer 流式拼接（内存占用极低）
+func (c *Composer) concatVideos(ctx context.Context, inputs []string, output string, opts pipeline.ComposeOpts) error {
 	if len(inputs) == 0 {
-		return fmt.Errorf("无视频输入")
+		return fmt.Errorf("无素材输入")
 	}
 
-	width := params.Width()
-	height := params.Height()
+	width := opts.Params.Width()
+	height := opts.Params.Height()
 	tempDir := filepath.Dir(output)
 
-	// 第一步：逐个标准化每个视频（每次只打开 1 个输入文件，内存占用极低）
+	// 第一步：逐个标准化每个素材（每次只打开 1 个输入文件，内存占用极低）
 	var normalizedFiles []string
 	for i, input := range inputs {
 		normFile := filepath.Join(tempDir, fmt.Sprintf("norm_%d.ts", i))
-		log.Printf("[FFmpeg] 标准化视频 [%d/%d]: %s → %s (%dx%d)",
-			i+1, len(inputs), filepath.Base(input), filepath.Base(normFile), width, height)
+		isImage := isImageFile(input)
+		modeStr := "视频"
+		if isImage {
+			modeStr = "图片"
+		}
+		log.Printf("[FFmpeg] 标准化%s [%d/%d]: %s → %s (%dx%d)",
+			modeStr, i+1, len(inputs), filepath.Base(input), filepath.Base(normFile), width, height)
 
-		if err := c.normalizeVideo(ctx, input, normFile, width, height); err != nil {
+		var err error
+		if isImage {
+			err = c.imageToVideo(ctx, input, normFile, width, height, opts.ClipSeconds)
+		} else {
+			err = c.normalizeVideo(ctx, input, normFile, width, height)
+		}
+		if err != nil {
 			// 清理已生成的临时文件
 			for _, f := range normalizedFiles {
 				os.Remove(f)
 			}
-			return fmt.Errorf("标准化视频 [%d] 失败: %w", i+1, err)
+			return fmt.Errorf("标准化素材 [%d] 失败: %w", i+1, err)
 		}
 		normalizedFiles = append(normalizedFiles, normFile)
 	}
 
 	// 第二步：用 concat demuxer 拼接（只读取文件列表，不同时打开所有文件）
-	log.Printf("[FFmpeg] 用 concat demuxer 拼接 %d 个标准化视频...", len(normalizedFiles))
+	log.Printf("[FFmpeg] 用 concat demuxer 拼接 %d 个标准化素材...", len(normalizedFiles))
 	err := c.concatDemuxer(ctx, normalizedFiles, output)
 
 	// 清理临时文件
@@ -240,6 +258,73 @@ func (c *Composer) normalizeVideo(ctx context.Context, input, output string, wid
 		}
 		if err != nil {
 			return fmt.Errorf("标准化失败: %w, output: %s", err, string(cmdOutput))
+		}
+	}
+	return nil
+}
+
+// isImageFile 判断文件是否为图片（根据扩展名）
+func isImageFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif":
+		return true
+	}
+	return false
+}
+
+// imageToVideo 将图片转换为视频片段（带缓慢缩放效果）
+func (c *Composer) imageToVideo(ctx context.Context, input, output string, width, height, clipSeconds int) error {
+	if clipSeconds <= 0 {
+		clipSeconds = 5
+	}
+	fps := 30
+	totalFrames := clipSeconds * fps
+
+	// 使用 zoompan 滤镜实现缓慢放大效果（Ken Burns）
+	// z='min(zoom+0.0005,1.3)'：从 1.0 缓慢放大到 1.3
+	// x='iw/2-(iw/zoom/2)'：水平居中
+	// y='ih/2-(ih/zoom/2)'：垂直居中
+	// d=1：每帧持续时间
+	// s=%dx%d：输出尺寸
+	// fps=%d：帧率
+	zoompanFilter := fmt.Sprintf(
+		"scale=%d:-1,zoompan=z='min(zoom+0.0005,1.3)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=%d:s=%dx%d:fps=%d",
+		width*2, // 先放大 2 倍确保有足够像素
+		totalFrames,
+		width, height, fps)
+
+	codec := c.codec
+	args := []string{
+		"-y",
+		"-loop", "1", // 循环读取图片
+		"-i", input, // 输入图片
+		"-t", fmt.Sprintf("%d", clipSeconds), // 视频时长
+		"-vf", zoompanFilter,
+		"-c:v", codec,
+		"-preset", "ultrafast",
+		"-crf", "23",
+		"-pix_fmt", "yuv420p",
+		"-f", "mpegts",
+		output,
+	}
+
+	cmd := exec.CommandContext(ctx, c.ffmpegPath, args...)
+	cmdOutput, err := cmd.CombinedOutput()
+	if err != nil {
+		// 回退到 libx264
+		if codec != "libx264" {
+			for i, arg := range args {
+				if arg == codec {
+					args[i] = "libx264"
+				}
+			}
+			cmd = exec.CommandContext(ctx, c.ffmpegPath, args...)
+			cmdOutput, err = cmd.CombinedOutput()
+		}
+		if err != nil {
+			log.Printf("[FFmpeg] 图片转视频失败: %v\nOutput: %s", err, string(cmdOutput))
+			return fmt.Errorf("图片转视频失败: %w, output: %s", err, string(cmdOutput))
 		}
 	}
 	return nil

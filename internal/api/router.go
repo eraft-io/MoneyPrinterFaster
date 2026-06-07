@@ -14,12 +14,21 @@ import (
 
 // Dependencies API 依赖注入
 type Dependencies struct {
-	Queue         queue.Queue
-	Pool          *worker.WorkerPool
-	StaticFS      fs.FS                // 静态资源文件系统（从 main 传入）
-	LLM           pipeline.LLMProvider // LLM 服务（用于文案预览）
-	MaterialReady bool                 // Material Provider 是否已配置
-	MaterialError string               // Material Provider 配置错误信息
+	Queue           queue.Queue
+	Pool            *worker.WorkerPool
+	StaticFS        fs.FS                // 静态资源文件系统（从 main 传入）
+	LLM             pipeline.LLMProvider // LLM 服务（用于文案预览）
+	MaterialReady   bool                 // Material Provider 是否已配置
+	MaterialError   string               // Material Provider 配置错误信息
+	MaterialSources []string             // 可用素材来源列表
+	ImageConfig     ImageConfig          // AI 图片生成配置（用于前端预估）
+}
+
+// ImageConfig AI 图片生成配置
+type ImageConfig struct {
+	ImageCount  int     // 每个关键词生成的图片数量
+	ClipSeconds int     // 每张图片展示时长（秒）
+	PricePerUSD float64 // 每张图片价格（美元）
 }
 
 // NewRouter 创建 HTTP 路由

@@ -86,10 +86,11 @@ type SubtitleConfig struct {
 }
 
 type MaterialConfig struct {
-	Source   string        `toml:"source"`
-	LocalDir string        `toml:"local_dir"`
-	Pexels   PexelsConfig  `toml:"pexels"`
-	Pixabay  PixabayConfig `toml:"pixabay"`
+	Source      string            `toml:"source"`
+	LocalDir    string            `toml:"local_dir"`
+	Pexels      PexelsConfig      `toml:"pexels"`
+	Pixabay     PixabayConfig     `toml:"pixabay"`
+	AliyunImage AliyunImageConfig `toml:"aliyun_image"`
 }
 
 type PexelsConfig struct {
@@ -98,6 +99,13 @@ type PexelsConfig struct {
 
 type PixabayConfig struct {
 	APIKeys []string `toml:"api_keys"`
+}
+
+type AliyunImageConfig struct {
+	APIKey      string `toml:"api_key"`
+	Model       string `toml:"model"`
+	ImageCount  int    `toml:"image_count"`  // 每个关键词生成的图片数量
+	ClipSeconds int    `toml:"clip_seconds"` // 每张图片展示时长（秒）
 }
 
 type FFmpegConfig struct {
@@ -245,6 +253,15 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Material.Source == "" {
 		cfg.Material.Source = def.Material.Source
+	}
+	if cfg.Material.AliyunImage.Model == "" {
+		cfg.Material.AliyunImage.Model = "z-image-turbo"
+	}
+	if cfg.Material.AliyunImage.ImageCount <= 0 {
+		cfg.Material.AliyunImage.ImageCount = 1
+	}
+	if cfg.Material.AliyunImage.ClipSeconds <= 0 {
+		cfg.Material.AliyunImage.ClipSeconds = 5
 	}
 	if cfg.FFmpeg.VideoCodec == "" {
 		cfg.FFmpeg.VideoCodec = def.FFmpeg.VideoCodec

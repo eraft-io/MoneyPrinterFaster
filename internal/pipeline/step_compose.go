@@ -28,6 +28,8 @@ type ComposeOpts struct {
 	BGMPath      string
 	Params       model.VideoParams
 	OutputIndex  int
+	IsImageMode  bool // 素材为图片模式（自动转换为视频片段）
+	ClipSeconds  int  // 图片模式下每张图的展示时长（秒）
 }
 
 // StepCompose 视频合成步骤
@@ -45,8 +47,13 @@ func (s *StepCompose) Execute(ctx context.Context, task *model.Task, prevData ma
 	videoPaths, _ := prevData["video_paths"].([]string)
 	audioPath, _ := prevData["audio_path"].(string)
 	subtitlePath, _ := prevData["subtitle_path"].(string)
+	isImageMode, _ := prevData["is_image_mode"].(bool)
+	clipSeconds, _ := prevData["clip_seconds"].(int)
+	if clipSeconds <= 0 {
+		clipSeconds = 5
+	}
 
-	log.Printf("[StepCompose] 开始视频合成: task=%s", task.ID)
+	log.Printf("[StepCompose] 开始视频合成: task=%s, image_mode=%v, clip_seconds=%d", task.ID, isImageMode, clipSeconds)
 	log.Printf("[StepCompose]   视频素材: %d 个", len(videoPaths))
 	for i, p := range videoPaths {
 		log.Printf("[StepCompose]     [%d] %s", i+1, p)
@@ -81,6 +88,8 @@ func (s *StepCompose) Execute(ctx context.Context, task *model.Task, prevData ma
 			BGMPath:      params.BGMFile,
 			Params:       params,
 			OutputIndex:  i + 1,
+			IsImageMode:  isImageMode,
+			ClipSeconds:  clipSeconds,
 		}
 
 		result, err := s.service.Compose(ctx, opts)

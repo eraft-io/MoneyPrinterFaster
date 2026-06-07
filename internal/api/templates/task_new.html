@@ -86,6 +86,35 @@ document.addEventListener('htmx:afterRequest', function(evt) {
             </label>
         </div>
 
+        {{if .MaterialSources}}
+        <div class="form-group">
+            <label>素材来源</label>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;">
+                {{range .MaterialSources}}
+                <label style="display:inline-flex;align-items:center;gap:6px;font-weight:400;text-transform:none;letter-spacing:0;margin-bottom:0;">
+                    <input type="radio" name="material_source" value="{{.}}" {{if eq . "pexels"}}checked{{end}}>
+                    {{if eq . "pexels"}}
+                        搜索视频素材 (Pexels)
+                    {{else if eq . "pixabay"}}
+                        搜索视频素材 (Pixabay)
+                    {{else if eq . "aliyun_image"}}
+                        AI 生成图片 (Z-Image)
+                    {{else if eq . "local"}}
+                        本地素材
+                    {{else}}
+                        {{.}}
+                    {{end}}
+                </label>
+                {{end}}
+            </div>
+            {{if .ImageConfig}}
+            <div id="image-estimate" style="margin-top:8px;padding:10px;background:#f5f5f5;border:1px solid #e5e5e5;font-size:0.85rem;display:none;">
+                <div id="estimate-content"></div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+
         <input type="hidden" name="bgm_enabled" value="on">
 
         <button type="submit" class="btn btn-danger" id="submit-btn" style="width:100%;padding:12px;font-size:1rem;text-transform:uppercase;letter-spacing:1px;">
@@ -140,6 +169,82 @@ async function generateScript() {
     }
 }
 </script>
+
+{{if .ImageConfig}}
+<script>
+// AI 图片生成预估
+const IMAGE_CONFIG = {
+    imageCount: {{.ImageConfig.ImageCount}},
+    clipSeconds: {{.ImageConfig.ClipSeconds}},
+    pricePerUSD: {{.ImageConfig.PricePerUSD}}
+};
+
+function updateImageEstimate() {
+    const estimateDiv = document.getElementById('image-estimate');
+    if (!estimateDiv) return;
+
+    const selectedSource = document.querySelector('input[name="material_source"]:checked');
+    if (!selectedSource || selectedSource.value !== 'aliyun_image') {
+        estimateDiv.style.display = 'none';
+        return;
+    }
+    estimateDiv.style.display = 'block';
+
+    const script = document.getElementById('script-textarea').value.trim();
+    if (!script) {
+        document.getElementById('estimate-content').innerHTML =
+            '<span style="color:#525252;">💡 填写文案后可预估图片数量和费用</span>';
+        return;
+    }
+
+    // 估算音频时长：中文约 4 字/秒，英文约 15 字符/秒
+    const chineseChars = (script.match(/[一-龥]/g) || []).length;
+    const otherChars = script.length - chineseChars;
+    const estimatedDuration = chineseChars / 4 + otherChars / 15;
+
+    // 估算关键词数量（按段落数，默认每段 1 个关键词）
+    const paragraphs = script.split(/\n+/).filter(p => p.trim().length > 0);
+    const numTerms = Math.max(paragraphs.length, 5);
+
+    // 计算需要的图片数
+    const totalClipsNeeded = Math.ceil(estimatedDuration / IMAGE_CONFIG.clipSeconds) + 1;
+    let clipsPerTerm = IMAGE_CONFIG.imageCount;
+    if (numTerms * clipsPerTerm < totalClipsNeeded) {
+        clipsPerTerm = Math.ceil(totalClipsNeeded / numTerms);
+    }
+    const totalImages = numTerms * clipsPerTerm;
+    const costUSD = totalImages * IMAGE_CONFIG.pricePerUSD;
+    const costCNY = (costUSD * 7.2).toFixed(2);
+
+    document.getElementById('estimate-content').innerHTML = `
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;">
+            <span style="color:#525252;">预估音频时长</span><span><b>${Math.round(estimatedDuration)}秒</b>（${Math.round(estimatedDuration/60)}分钟）</span>
+            <span style="color:#525252;">关键词数量</span><span><b>${numTerms}</b> 个</span>
+            <span style="color:#525252;">每关键词图片</span><span><b>${clipsPerTerm}</b> 张 × ${IMAGE_CONFIG.clipSeconds}秒/张</span>
+            <span style="color:#525252;">图片总数</span><span><b>${totalImages}</b> 张</span>
+            <span style="color:#525252;">预估费用</span><span><b>$${costUSD.toFixed(2)}</b> ≈ ¥${costCNY}</span>
+        </div>
+        <div style="margin-top:6px;font-size:0.75rem;color:#a3a3a3;">
+            * Z-Image Turbo 单价 $${IMAGE_CONFIG.pricePerUSD}/张，实际费用以阿里云账单为准
+        </div>
+    `;
+}
+
+// 监听素材来源变化
+document.querySelectorAll('input[name="material_source"]').forEach(radio => {
+    radio.addEventListener('change', updateImageEstimate);
+});
+
+// 监听文案变化
+const scriptTextarea = document.getElementById('script-textarea');
+if (scriptTextarea) {
+    scriptTextarea.addEventListener('input', updateImageEstimate);
+}
+
+// 初始化
+updateImageEstimate();
+</script>
+{{end}}
 
 <div id="task-list-container">
     <div class="card">

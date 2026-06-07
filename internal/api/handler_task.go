@@ -54,6 +54,7 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		BGMFile          string  `json:"bgm_file,omitempty"`
 		BGMVolume        float64 `json:"bgm_volume"`
 		Priority         int     `json:"priority"`
+		MaterialSource   string  `json:"material_source,omitempty"`
 	}
 
 	contentType := r.Header.Get("Content-Type")
@@ -84,6 +85,7 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		req.SubtitleColor = r.FormValue("subtitle_color")
 		req.SubtitlePosition = r.FormValue("subtitle_position")
 		req.BGMFile = r.FormValue("bgm_file")
+		req.MaterialSource = r.FormValue("material_source")
 		req.ParagraphNumber, _ = strconv.Atoi(r.FormValue("paragraph_number"))
 		req.ClipDuration, _ = strconv.Atoi(r.FormValue("clip_duration"))
 		req.VideoCount, _ = strconv.Atoi(r.FormValue("video_count"))
@@ -173,6 +175,7 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		BGMEnabled:       req.BGMEnabled,
 		BGMFile:          req.BGMFile,
 		BGMVolume:        req.BGMVolume,
+		MaterialSource:   req.MaterialSource,
 	}
 
 	taskID, err := h.deps.Queue.Submit(r.Context(), params, model.TaskPriority(req.Priority))

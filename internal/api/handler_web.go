@@ -55,7 +55,10 @@ func NewWebHandler(deps *Dependencies) *WebHandler {
 // IndexPage 首页（创建任务 + 任务列表）
 func (h *WebHandler) IndexPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := templates.ExecuteTemplate(w, "layout", nil); err != nil {
+	if err := templates.ExecuteTemplate(w, "layout", map[string]any{
+		"MaterialSources": h.deps.MaterialSources,
+		"ImageConfig":     h.deps.ImageConfig,
+	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

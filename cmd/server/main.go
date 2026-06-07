@@ -87,18 +87,72 @@ func main() {
 	subtitleProvider := subtitle.NewProvider(&cfg.Subtitle)
 	log.Printf("Subtitle Provider 初始化完成 (provider=%s)", cfg.Subtitle.Provider)
 
-	// 初始化 Material Provider
+	// 初始化 Material Provider（多 provider 模式）
+	materialProviders := make(map[string]pipeline.MaterialProvider)
+	var materialSources []string
+	defaultMaterialSource := cfg.Material.Source
+
+	// 尝试初始化所有配置的素材来源
+	sources := map[string]struct {
+		check  func() bool
+		create func() (pipeline.MaterialProvider, error)
+	}{
+		"pexels": {
+			check:  func() bool { return len(cfg.Material.Pexels.APIKeys) > 0 && cfg.Material.Pexels.APIKeys[0] != "" },
+			create: func() (pipeline.MaterialProvider, error) { return material.NewPexels(cfg.Material.Pexels.APIKeys), nil },
+		},
+		"pixabay": {
+			check: func() bool { return len(cfg.Material.Pixabay.APIKeys) > 0 && cfg.Material.Pixabay.APIKeys[0] != "" },
+			create: func() (pipeline.MaterialProvider, error) {
+				return material.NewPixabay(cfg.Material.Pixabay.APIKeys), nil
+			},
+		},
+		"aliyun_image": {
+			check: func() bool { return cfg.Material.AliyunImage.APIKey != "" },
+			create: func() (pipeline.MaterialProvider, error) {
+				return material.NewAliyunImage(
+					cfg.Material.AliyunImage.APIKey,
+					cfg.Material.AliyunImage.Model,
+					cfg.Material.AliyunImage.ImageCount,
+					cfg.Material.AliyunImage.ClipSeconds,
+				), nil
+			},
+		},
+		"local": {
+			check:  func() bool { return cfg.Material.LocalDir != "" },
+			create: func() (pipeline.MaterialProvider, error) { return material.NewLocal(cfg.Material.LocalDir), nil },
+		},
+	}
+
+	for name, src := range sources {
+		if src.check() {
+			p, err := src.create()
+			if err != nil {
+				log.Printf("警告: %s Provider 初始化失败: %v", name, err)
+				continue
+			}
+			materialProviders[name] = p
+			materialSources = append(materialSources, name)
+			log.Printf("Material Provider 初始化完成: %s", name)
+		}
+	}
+
+	// 检查默认来源是否可用
 	var materialErr error
-	materialProvider, materialErr := material.NewProvider(&cfg.Material)
-	if materialErr != nil {
+	if len(materialProviders) == 0 {
+		materialErr = fmt.Errorf("未配置任何素材服务")
 		log.Printf("========================================")
-		log.Printf("警告: Material Provider 初始化失败: %v", materialErr)
+		log.Printf("警告: 未配置任何素材服务")
 		log.Printf("请配置 Pexels API Key: 访问 https://www.pexels.com/api/ 免费申请")
 		log.Printf("然后在 config.toml 的 [material.pexels] 中填写 api_keys")
 		log.Printf("========================================")
-		materialProvider = nil
-	} else {
-		log.Printf("Material Provider 初始化完成 (source=%s)", cfg.Material.Source)
+	} else if _, ok := materialProviders[defaultMaterialSource]; !ok {
+		// 默认来源不可用，使用第一个可用的
+		for name := range materialProviders {
+			defaultMaterialSource = name
+			log.Printf("警告: 默认素材来源 %q 未配置，使用 %q", cfg.Material.Source, name)
+			break
+		}
 	}
 
 	// 初始化 Composer
@@ -116,8 +170,8 @@ func main() {
 		steps = append(steps, pipeline.NewStepTTS(ttsProvider))
 	}
 	steps = append(steps, pipeline.NewStepSubtitle(subtitleProvider))
-	if materialProvider != nil {
-		steps = append(steps, pipeline.NewStepMaterial(materialProvider))
+	if len(materialProviders) > 0 {
+		steps = append(steps, pipeline.NewStepMaterialMulti(materialProviders, defaultMaterialSource))
 	}
 	if composer != nil {
 		steps = append(steps, pipeline.NewStepCompose(composer))
@@ -139,12 +193,18 @@ func main() {
 		materialErrMsg = materialErr.Error()
 	}
 	deps := &api.Dependencies{
-		Queue:         q,
-		Pool:          pool,
-		StaticFS:      webstatic.StaticFS,
-		LLM:           llmProvider,
-		MaterialReady: materialProvider != nil,
-		MaterialError: materialErrMsg,
+		Queue:           q,
+		Pool:            pool,
+		StaticFS:        webstatic.StaticFS,
+		LLM:             llmProvider,
+		MaterialReady:   len(materialProviders) > 0,
+		MaterialError:   materialErrMsg,
+		MaterialSources: materialSources,
+		ImageConfig: api.ImageConfig{
+			ImageCount:  cfg.Material.AliyunImage.ImageCount,
+			ClipSeconds: cfg.Material.AliyunImage.ClipSeconds,
+			PricePerUSD: 0.015, // z-image-turbo prompt_extend=false: $0.015/张
+		},
 	}
 	router := api.NewRouter(deps)
 

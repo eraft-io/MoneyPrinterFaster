@@ -64,7 +64,7 @@ POST /tasks
 **curl 示例（JSON）：**
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/tasks \
+curl -s -X POST "http://localhost:8080/api/v1/tasks" \
   -H "Content-Type: application/json" \
   -H "X-Client-Token: $(uuidgen)" \
   -d '{
@@ -80,7 +80,7 @@ curl -s -X POST http://localhost:8080/api/v1/tasks \
 **curl 示例（Form）：**
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/tasks \
+curl -s -X POST "http://localhost:8080/api/v1/tasks" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "client_token=$(uuidgen)" \
   -d "subject=人工智能的未来" \
@@ -136,7 +136,7 @@ GET /tasks?offset=0&limit=20
 **curl 示例：**
 
 ```bash
-curl -s http://localhost:8080/api/v1/tasks?offset=0\&limit=10
+curl -s "http://localhost:8080/api/v1/tasks?offset=0&limit=10"
 ```
 
 **响应 `200 OK`：**
@@ -201,7 +201,7 @@ GET /tasks/{id}
 **curl 示例：**
 
 ```bash
-curl -s http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000
+curl -s "http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000"
 ```
 
 **响应 `200 OK`：**
@@ -254,7 +254,7 @@ DELETE /tasks/{id}
 **curl 示例：**
 
 ```bash
-curl -s -X DELETE http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000
+curl -s -X DELETE "http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000"
 ```
 
 **成功响应 `200 OK`：**
@@ -288,7 +288,7 @@ GET /tasks/{id}/download
 **curl 示例：**
 
 ```bash
-curl -o output.mp4 http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000/download
+curl -o output.mp4 "http://localhost:8080/api/v1/tasks/550e8400-e29b-41d4-a716-446655440000/download"
 ```
 
 **成功响应 `200 OK`：** 返回 `video/mp4` 文件流
@@ -324,7 +324,7 @@ GET /status
 **curl 示例：**
 
 ```bash
-curl -s http://localhost:8080/api/v1/status
+curl -s "http://localhost:8080/api/v1/status"
 ```
 
 **响应 `200 OK`：**
@@ -350,7 +350,7 @@ POST /llm/generate-script
 **curl 示例：**
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/llm/generate-script \
+curl -s -X POST "http://localhost:8080/api/v1/llm/generate-script" \
   -H "Content-Type: application/json" \
   -d '{
     "subject": "人工智能的未来",
@@ -476,10 +476,10 @@ pending → processing → completed
 
 ```bash
 # 访问首页
-curl http://localhost:8080/
+curl "http://localhost:8080/"
 
 # 获取任务列表 HTML 片段
-curl http://localhost:8080/tasks/list
+curl "http://localhost:8080/tasks/list"
 ```
 
 ---
@@ -502,13 +502,13 @@ curl http://localhost:8080/tasks/list
 
 ```bash
 # 1. 生成文案
-curl -s -X POST http://localhost:8080/api/v1/llm/generate-script \
+curl -s -X POST "http://localhost:8080/api/v1/llm/generate-script" \
   -H "Content-Type: application/json" \
   -d '{"subject": "宇宙探索", "language": "zh-CN", "paragraph_number": 5}'
 # => {"script": "人类对宇宙的探索从未停止..."}
 
 # 2. 创建视频任务
-TASK_ID=$(curl -s -X POST http://localhost:8080/api/v1/tasks \
+TASK_ID=$(curl -s -X POST "http://localhost:8080/api/v1/tasks" \
   -H "Content-Type: application/json" \
   -H "X-Client-Token: $(uuidgen)" \
   -d '{
@@ -523,15 +523,15 @@ echo "Task ID: $TASK_ID"
 # => Task ID: 550e8400-e29b-41d4-a716-446655440000
 
 # 3. 查看系统状态
-curl -s http://localhost:8080/api/v1/status
+curl -s "http://localhost:8080/api/v1/status"
 # => {"active_workers":3,"target_workers":4,"cpu_usage":12.5,"queue_length":1,"num_cpu":8}
 
 # 4. 轮询任务状态
-curl -s http://localhost:8080/api/v1/tasks/$TASK_ID | jq .state
+curl -s "http://localhost:8080/api/v1/tasks/$TASK_ID" | jq .state
 # => "processing"
 
 # 5. 任务完成后下载视频
-curl -s http://localhost:8080/api/v1/tasks/$TASK_ID | jq .state
+curl -s "http://localhost:8080/api/v1/tasks/$TASK_ID" | jq .state
 # => "completed"
-curl -o output.mp4 http://localhost:8080/api/v1/tasks/$TASK_ID/download
+curl -o output.mp4 "http://localhost:8080/api/v1/tasks/$TASK_ID/download"
 ```

@@ -18,7 +18,7 @@ scale_interval = "5s"      # 扩缩容检查间隔
 cpu_sample_interval = "2s" # CPU 采样间隔
 
 [llm]
-provider = "openai"        # "openai" | "deepseek" | "ollama"
+provider = "deepseek"        # "deepseek" ｜ "openai" |  "ollama"
 
 [llm.openai]
 api_key = ""
@@ -53,14 +53,23 @@ voice = "alloy"
 provider = "edge"          # "edge" | "whisper" | ""（留空不生成字幕）
 
 [material]
-source = "pexels"          # "pexels" | "pixabay" | "local"
+source = "pexels"          # "pexels" | "pixabay" | "local" | "aliyun_image"
 local_dir = ""             # 本地素材目录（source = "local" 时使用）
 
 [material.pexels]
-api_keys = []
+api_keys = [""]
 
 [material.pixabay]
-api_keys = []
+api_keys = [""]
+
+# 阿里云百炼文生图（Z-Image 模型）
+# source = "aliyun_image" 时使用
+# API Key 获取：https://bailian.console.aliyun.com/
+[material.aliyun_image]
+api_key = ""               # 阿里云百炼 API Key
+model = "z-image-turbo"    # 模型名称
+image_count = 2            # 每个关键词生成的图片数量
+clip_seconds = 5           # 每张图片展示时长（秒）
 
 [ffmpeg]
 binary_path = ""           # 留空自动检测
