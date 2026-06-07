@@ -158,7 +158,7 @@ func (q *MemoryQueue) Cancel(taskID string) error {
 	q.mu.Unlock()
 
 	// 更新 SQLite
-	q.store.UpdateState(taskID, model.StateCancelled, "", "", 0)
+	q.store.UpdateState(taskID, model.StateCancelled, "", "", 0, task.Params.Script)
 	q.notify(model.NewProgressEvent(taskID, model.StateCancelled, task.Progress, "", "任务已取消"))
 	return nil
 }
@@ -243,7 +243,7 @@ func (q *MemoryQueue) SetState(taskID string, state model.TaskState, errMsg stri
 	q.mu.Unlock()
 
 	// 更新 SQLite
-	q.store.UpdateState(taskID, state, task.Error, task.OutputPath, task.VideoDuration)
+	q.store.UpdateState(taskID, state, task.Error, task.OutputPath, task.VideoDuration, task.Params.Script)
 
 	evt := model.NewProgressEvent(taskID, state, task.Progress, "", errMsg)
 	q.notify(evt)
@@ -272,6 +272,12 @@ func (q *MemoryQueue) Unsubscribe(ch <-chan model.ProgressEvent) {
 			return
 		}
 	}
+}
+
+// FindExistingTask 查找已存在的相同主题+文案任务（非取消状态）
+func (q *MemoryQueue) FindExistingTask(subject, script string) *model.Task {
+	task, _ := q.store.FindBySubjectAndScript(subject, script)
+	return task
 }
 
 // notify 通知所有订阅者

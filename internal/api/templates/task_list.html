@@ -4,6 +4,7 @@
         <tr>
             <th>任务 ID</th>
             <th>主题</th>
+            <th>文案</th>
             <th>状态</th>
             <th>进度</th>
             <th>视频时长</th>
@@ -17,6 +18,13 @@
         <tr id="task-{{.ID}}">
             <td><code>{{slice .ID 0 8}}...</code></td>
             <td>{{.Params.Subject}}</td>
+            <td>
+                {{if .Params.Script}}
+                <div style="max-width:180px;font-size:0.8rem;line-height:1.4;" title="{{.Params.Script}}">{{truncate .Params.Script 40}}</div>
+                {{else}}
+                <span style="font-size:0.8rem;">-</span>
+                {{end}}
+            </td>
             <td>
                 <span class="badge badge-{{.State}}">{{.State}}</span>
                 {{if .Error}}
@@ -60,7 +68,7 @@
         </tr>
         {{else}}
         <tr>
-            <td colspan="8" style="text-align:center;padding:32px;">
+            <td colspan="9" style="text-align:center;padding:32px;">
                 暂无任务
             </td>
         </tr>

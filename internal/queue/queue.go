@@ -24,6 +24,8 @@ type Queue interface {
 	SetState(taskID string, state model.TaskState, errMsg string) error
 	// Subscribe 订阅任务状态变更事件（用于 WebSocket 推送）
 	Subscribe() <-chan model.ProgressEvent
+	// FindExistingTask 查找已存在的相同主题+文案任务（用于去重）
+	FindExistingTask(subject, script string) *model.Task
 	// Close 关闭队列
 	Close() error
 }

@@ -39,6 +39,8 @@ func (s *StepLLM) Execute(ctx context.Context, task *model.Task, prevData map[st
 		if err != nil {
 			return nil, fmt.Errorf("生成文案失败: %w", err)
 		}
+		// 回写到 task，以便持久化到 SQLite
+		task.Params.Script = script
 	}
 
 	// 生成搜索关键词

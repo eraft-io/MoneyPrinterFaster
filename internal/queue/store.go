@@ -61,14 +61,25 @@ func createTables(db *sql.DB) error {
 		finished_at TEXT,
 		output_path TEXT DEFAULT '',
 		video_duration REAL NOT NULL DEFAULT 0,
-		current_step TEXT DEFAULT ''
+		current_step TEXT DEFAULT '',
+		script TEXT DEFAULT ''
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_tasks_state ON tasks(state);
 	CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC);
 	`
 	_, err := db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 迁移：为旧表添加 script 列
+	_, err = db.Exec("ALTER TABLE tasks ADD COLUMN script TEXT DEFAULT ''")
+	if err != nil {
+		// 忽略 "duplicate column" 错误（列已存在）
+		return nil
+	}
+	return nil
 }
 
 // Save 保存任务（upsert）
@@ -87,8 +98,8 @@ func (s *SQLiteStore) Save(task *model.Task) error {
 	}
 
 	_, err = s.db.Exec(`
-		INSERT OR REPLACE INTO tasks (id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration, current_step)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT OR REPLACE INTO tasks (id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration, current_step, script)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		task.ID,
 		string(task.State),
@@ -102,21 +113,22 @@ func (s *SQLiteStore) Save(task *model.Task) error {
 		task.OutputPath,
 		task.VideoDuration,
 		"", // current_step 由 UpdateProgress 单独更新
+		task.Params.Script,
 	)
 	return err
 }
 
-// UpdateState 更新任务状态
-func (s *SQLiteStore) UpdateState(taskID string, state model.TaskState, errMsg string, outputPath string, videoDuration float64) error {
+// UpdateState 更新任务状态（含文案回写）
+func (s *SQLiteStore) UpdateState(taskID string, state model.TaskState, errMsg string, outputPath string, videoDuration float64, script string) error {
 	var finishedAt sql.NullString
 	if state.IsTerminal() {
 		finishedAt = sql.NullString{String: time.Now().Format(time.RFC3339), Valid: true}
 	}
 
 	_, err := s.db.Exec(`
-		UPDATE tasks SET state = ?, error = ?, finished_at = ?, output_path = ?, video_duration = ?
+		UPDATE tasks SET state = ?, error = ?, finished_at = ?, output_path = ?, video_duration = ?, script = ?
 		WHERE id = ?
-	`, string(state), errMsg, finishedAt, outputPath, videoDuration, taskID)
+	`, string(state), errMsg, finishedAt, outputPath, videoDuration, script, taskID)
 	return err
 }
 
@@ -140,7 +152,7 @@ func (s *SQLiteStore) MarkStarted(taskID string) error {
 // GetPending 获取所有未完成任务（用于恢复）
 func (s *SQLiteStore) GetPending() ([]*model.Task, error) {
 	rows, err := s.db.Query(`
-		SELECT id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration
+		SELECT id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration, script
 		FROM tasks
 		WHERE state IN ('pending', 'processing')
 		ORDER BY created_at ASC
@@ -166,7 +178,7 @@ func (s *SQLiteStore) GetPending() ([]*model.Task, error) {
 // ListAll 列出所有任务（按创建时间降序）
 func (s *SQLiteStore) ListAll() ([]*model.Task, error) {
 	rows, err := s.db.Query(`
-		SELECT id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration
+		SELECT id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration, script
 		FROM tasks
 		ORDER BY created_at DESC
 	`)
@@ -192,6 +204,43 @@ func (s *SQLiteStore) Delete(taskID string) error {
 	return err
 }
 
+// FindBySubjectAndScript 根据主题和文案查找已存在的任务（非取消状态）
+func (s *SQLiteStore) FindBySubjectAndScript(subject, script string) (*model.Task, error) {
+	// 匹配条件：主题相同，且文案相同（都非空时才匹配）
+	rows, err := s.db.Query(`
+		SELECT id, state, priority, params, progress, error, created_at, started_at, finished_at, output_path, video_duration, script
+		FROM tasks
+		WHERE state != 'cancelled'
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			continue
+		}
+		// 主题必须相同
+		if task.Params.Subject != subject {
+			continue
+		}
+		// 文案匹配逻辑：
+		// 1. 两者都非空且相同 → 匹配
+		// 2. 两者都为空（都是自动生成）且主题相同 → 匹配
+		existScript := task.Params.Script
+		if script == "" && existScript == "" {
+			return task, nil
+		}
+		if script != "" && existScript != "" && script == existScript {
+			return task, nil
+		}
+	}
+	return nil, nil // 未找到匹配任务
+}
+
 // Close 关闭数据库
 func (s *SQLiteStore) Close() error {
 	if s.db != nil {
@@ -206,16 +255,21 @@ func scanTask(rows *sql.Rows) (*model.Task, error) {
 	var priority int
 	var progress, videoDuration float64
 	var startedAtStr, finishedAtStr sql.NullString
-	var outputPath string
+	var outputPath, script string
 
 	err := rows.Scan(&id, &state, &priority, &paramsJSON, &progress, &errMsg, &createdAtStr,
-		&startedAtStr, &finishedAtStr, &outputPath, &videoDuration)
+		&startedAtStr, &finishedAtStr, &outputPath, &videoDuration, &script)
 	if err != nil {
 		return nil, err
 	}
 
 	var params model.VideoParams
 	json.Unmarshal([]byte(paramsJSON), &params)
+
+	// 优先使用数据库中存储的 script（可能由 LLM 自动生成后回写）
+	if script != "" && params.Script == "" {
+		params.Script = script
+	}
 
 	createdAt, _ := time.Parse(time.RFC3339, createdAtStr)
 

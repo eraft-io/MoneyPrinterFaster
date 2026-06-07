@@ -39,6 +39,13 @@ func init() {
 		"newUUID": func() string {
 			return uuid.New().String()
 		},
+		"truncate": func(s string, n int) string {
+			runes := []rune(s)
+			if len(runes) <= n {
+				return s
+			}
+			return string(runes[:n]) + "..."
+		},
 	}
 	templates = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html"))
 }
