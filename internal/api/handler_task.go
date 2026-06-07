@@ -154,17 +154,6 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 去重检查：如果已存在相同主题+文案的任务，直接返回已有任务 ID
-	if existingTask := h.deps.Queue.FindExistingTask(req.Subject, req.Script); existingTask != nil {
-		log.Printf("[Task] 发现重复任务，返回已有 ID: %s (subject=%q)", existingTask.ID, req.Subject)
-		writeJSON(w, http.StatusOK, map[string]string{
-			"task_id":     existingTask.ID,
-			"status":      string(existingTask.State),
-			"is_existing": "true",
-		})
-		return
-	}
-
 	params := model.VideoParams{
 		Subject:          req.Subject,
 		Script:           req.Script,
@@ -195,10 +184,18 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]string{
+	// 检查是否为已存在的任务（去重命中）
+	resp := map[string]string{
 		"task_id": taskID,
 		"status":  "submitted",
-	})
+	}
+	if task, err := h.deps.Queue.Get(taskID); err == nil {
+		resp["status"] = string(task.State)
+		if time.Since(task.CreatedAt) > 5*time.Second {
+			resp["is_existing"] = "true"
+		}
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 // ListTasks 列出任务

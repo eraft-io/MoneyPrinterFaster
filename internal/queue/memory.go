@@ -75,16 +75,21 @@ func (q *MemoryQueue) recoverFromStore() error {
 	return nil
 }
 
-// Submit 提交任务到队列
+// Submit 提交任务到队列（内置主题+文案去重，原子操作）
 func (q *MemoryQueue) Submit(ctx context.Context, params model.VideoParams, priority model.TaskPriority) (string, error) {
 	q.mu.Lock()
 	if q.closed {
 		q.mu.Unlock()
 		return "", fmt.Errorf("队列已关闭")
 	}
-	q.mu.Unlock()
 
 	params.Defaults()
+
+	// 去重检查：在锁内查 SQLite，防止并发竞态
+	if existing, _ := q.store.FindBySubjectAndScript(params.Subject, params.Script); existing != nil {
+		q.mu.Unlock()
+		return existing.ID, nil
+	}
 
 	task := &model.Task{
 		ID:        uuid.New().String(),
@@ -94,13 +99,13 @@ func (q *MemoryQueue) Submit(ctx context.Context, params model.VideoParams, prio
 		CreatedAt: time.Now(),
 	}
 
-	// 1. 写 SQLite
+	// 1. 写 SQLite（锁内完成，保证原子性）
 	if err := q.store.Save(task); err != nil {
+		q.mu.Unlock()
 		return "", fmt.Errorf("SQLite 写入失败: %w", err)
 	}
 
 	// 2. 入内存索引
-	q.mu.Lock()
 	q.tasks[task.ID] = task
 	q.mu.Unlock()
 
