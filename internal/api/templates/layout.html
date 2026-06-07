@@ -266,9 +266,11 @@
                     errDiv.textContent = data.message;
                 }
             }
-            // 任何状态变化都刷新任务列表
-            if (window.htmx) {
-                htmx.ajax('GET', '/tasks/list', '#task-list-container');
+            // 任务完成/失败时刷新列表（而非每条消息都刷新）
+            if (data.state === 'completed' || data.state === 'failed') {
+                if (window.htmx) {
+                    htmx.ajax('GET', '/tasks/list', '#task-list-container');
+                }
             }
         };
     } catch(e) { console.log('WebSocket not available'); }

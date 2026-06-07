@@ -7,6 +7,24 @@
         <input type="hidden" name="client_token" id="client-token" value="{{newUUID}}">
 
 <script>
+// 防重复提交状态管理
+var _submitting = false;
+
+document.addEventListener('htmx:configRequest', function(evt) {
+    if (evt.target.id !== 'task-form') return;
+    if (_submitting) {
+        evt.preventDefault(); // 阻止重复提交
+        return;
+    }
+    _submitting = true;
+    // 禁用提交按钮，防止连点
+    var btn = document.getElementById('submit-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '提交中...';
+    }
+});
+
 document.addEventListener('htmx:afterRequest', function(evt) {
     if (evt.target.id !== 'task-form') return;
     var result = document.getElementById('task-result');
@@ -21,13 +39,22 @@ document.addEventListener('htmx:afterRequest', function(evt) {
         } catch(e) {}
         result.innerHTML = '<div style="padding:12px;border:2px solid #000;background:#fff;color:#000;font-weight:700">' + msg + '</div>';
     }
-    // 请求完成后刷新 token，允许用户再次提交
-    try {
-        document.getElementById('client-token').value = crypto.randomUUID();
-    } catch(e) {
-        // 降级：浏览器不支持 crypto.randomUUID 时用时间戳+随机数
-        document.getElementById('client-token').value = Date.now() + '-' + Math.random().toString(36).slice(2);
-    }
+    // 5 秒内禁止再次提交（服务端幂等窗口 + 前端防抖双保险）
+    // 注意：不再立即刷新 client_token，同一 token 在 60 秒内被服务端拦截
+    setTimeout(function() {
+        _submitting = false;
+        var btn = document.getElementById('submit-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '提交任务';
+        }
+        // 延迟刷新 token，确保下次提交使用新 token
+        try {
+            document.getElementById('client-token').value = crypto.randomUUID();
+        } catch(e) {
+            document.getElementById('client-token').value = Date.now() + '-' + Math.random().toString(36).slice(2);
+        }
+    }, 5000);
 });
 </script>
 
