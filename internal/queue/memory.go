@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -109,36 +110,65 @@ func (q *MemoryQueue) Submit(ctx context.Context, params model.VideoParams, prio
 	q.tasks[task.ID] = task
 	q.mu.Unlock()
 
-	// 3. 非阻塞入 channel
+	// 3. 非阻塞入 channel（满则跳过，Dequeue 兜底扫描会捞到）
 	select {
 	case q.ch <- task:
 	default:
-		// channel 满，任务已在索引中，dequeue 会兜底扫描
+		log.Printf("[Queue] channel 满，任务 %s 未入队，等待兜底扫描", task.ID[:8])
 	}
 
 	q.notify(model.NewProgressEvent(task.ID, model.StatePending, 0, "", "任务已提交"))
 	return task.ID, nil
 }
 
-// Dequeue 从队列取出一个任务（阻塞等待）
+// Dequeue 从队列取出一个任务（阻塞等待，带兜底扫描）
 func (q *MemoryQueue) Dequeue(ctx context.Context) (*model.Task, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case task := <-q.ch:
-		if task == nil {
-			return nil, fmt.Errorf("队列已关闭")
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case task := <-q.ch:
+			if task == nil {
+				return nil, fmt.Errorf("队列已关闭")
+			}
+			q.mu.RLock()
+			latest, ok := q.tasks[task.ID]
+			q.mu.RUnlock()
+			if !ok || latest.State.IsTerminal() {
+				continue // 已终态，跳过继续取下一个
+			}
+			return task, nil
+		case <-time.After(2 * time.Second):
+			// channel 2 秒无任务，兜底扫描内存索引中的 pending 任务
+			task, err := q.scanPending()
+			if err != nil {
+				return nil, err
+			}
+			if task != nil {
+				return task, nil
+			}
+			// 无 pending 任务，继续循环等待
 		}
-		// 检查是否已被取消
-		q.mu.RLock()
-		latest, ok := q.tasks[task.ID]
-		q.mu.RUnlock()
-		if !ok || latest.State.IsTerminal() {
-			// 任务已被取消或已完成，跳过
-			return q.Dequeue(ctx) // 递归取下一个
-		}
-		return task, nil
 	}
+}
+
+// scanPending 兜底扫描：从内存索引中查找 pending 任务
+func (q *MemoryQueue) scanPending() (*model.Task, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	var oldest *model.Task
+	for _, task := range q.tasks {
+		if task.State == model.StatePending {
+			if oldest == nil || task.CreatedAt.Before(oldest.CreatedAt) {
+				oldest = task
+			}
+		}
+	}
+	if oldest != nil {
+		log.Printf("[Queue] 兜底扫描命中 pending 任务: %s", oldest.ID[:8])
+	}
+	return oldest, nil
 }
 
 // Cancel 取消任务
