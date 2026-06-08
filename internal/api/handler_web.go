@@ -14,7 +14,10 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
-var templates *template.Template
+var (
+	templates         *template.Template
+	settingsTemplates *template.Template
+)
 
 func init() {
 	funcMap := template.FuncMap{
@@ -48,6 +51,8 @@ func init() {
 		},
 	}
 	templates = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html"))
+	// Settings 使用独立模板集（只解析 layout + settings，避免 "content" 定义冲突）
+	settingsTemplates = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/layout.html", "templates/settings.html"))
 }
 
 // WebHandler HTMX Web 页面 Handler
@@ -82,6 +87,14 @@ func (h *WebHandler) TaskList(w http.ResponseWriter, r *http.Request) {
 	if err := templates.ExecuteTemplate(w, "task_list", map[string]any{
 		"Tasks": tasks,
 	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// SettingsPage 配置管理页面
+func (h *WebHandler) SettingsPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := settingsTemplates.ExecuteTemplate(w, "layout", nil); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

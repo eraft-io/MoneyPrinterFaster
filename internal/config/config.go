@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -113,7 +114,11 @@ type FFmpegConfig struct {
 	VideoCodec string `toml:"video_codec"`
 }
 
-var global *Config
+var (
+	global     *Config
+	globalMu   sync.RWMutex
+	globalPath string
+)
 
 // Load 从指定路径加载 TOML 配置文件
 func Load(path string) (*Config, error) {
@@ -121,7 +126,10 @@ func Load(path string) (*Config, error) {
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// 配置文件不存在，使用默认值
+		globalMu.Lock()
 		global = cfg
+		globalPath = path
+		globalMu.Unlock()
 		return cfg, nil
 	}
 
@@ -131,16 +139,50 @@ func Load(path string) (*Config, error) {
 
 	// 应用默认值填充
 	applyDefaults(cfg)
+	globalMu.Lock()
 	global = cfg
+	globalPath = path
+	globalMu.Unlock()
 	return cfg, nil
 }
 
 // Get 获取全局配置（Load 后可调用）
 func Get() *Config {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
 	if global == nil {
-		global = defaultConfig()
+		return defaultConfig()
 	}
 	return global
+}
+
+// GetPath 获取配置文件路径
+func GetPath() string {
+	globalMu.RLock()
+	defer globalMu.RUnlock()
+	return globalPath
+}
+
+// Update 更新全局配置并保存到文件
+func Update(newCfg *Config) error {
+	applyDefaults(newCfg)
+	globalMu.Lock()
+	global = newCfg
+	path := globalPath
+	globalMu.Unlock()
+
+	if path == "" {
+		path = "config.toml"
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	encoder := toml.NewEncoder(f)
+	return encoder.Encode(newCfg)
 }
 
 func defaultConfig() *Config {

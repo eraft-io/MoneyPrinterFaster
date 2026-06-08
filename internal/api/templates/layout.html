@@ -227,8 +227,11 @@
     <header>
         <div style="display:flex;justify-content:space-between;align-items:center;max-width:1200px;margin:0 auto;padding:0 20px;">
             <h1>💸 MoneyPrinterFaster</h1>
-            <div class="status-info" id="status-badge">
-                <span hx-get="/api/v1/status" hx-trigger="load, every 5s" hx-swap="innerHTML">加载中...</span>
+            <div style="display:flex;align-items:center;gap:16px;">
+                <a href="/settings" class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem;">⚙️ 设置</a>
+                <div class="status-info" id="status-badge">
+                    <span hx-get="/api/v1/status" hx-trigger="load, every 5s" hx-swap="innerHTML">加载中...</span>
+                </div>
             </div>
         </div>
     </header>

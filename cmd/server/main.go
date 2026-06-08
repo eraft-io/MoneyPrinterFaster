@@ -211,6 +211,7 @@ func main() {
 			ClipSeconds: cfg.Material.AliyunImage.ClipSeconds,
 			PricePerUSD: 0.015, // z-image-turbo prompt_extend=false: $0.015/张
 		},
+		ConfigPath: *configPath,
 	}
 	router := api.NewRouter(deps)
 

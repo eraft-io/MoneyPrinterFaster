@@ -22,6 +22,7 @@ type Dependencies struct {
 	MaterialError   string               // Material Provider 配置错误信息
 	MaterialSources []string             // 可用素材来源列表
 	ImageConfig     ImageConfig          // AI 图片生成配置（用于前端预估）
+	ConfigPath      string               // 配置文件路径
 }
 
 // ImageConfig AI 图片生成配置
@@ -53,6 +54,11 @@ func NewRouter(deps *Dependencies) http.Handler {
 		// LLM 相关
 		llmH := NewLLMHandler(deps)
 		r.Post("/llm/generate-script", llmH.GenerateScript)
+
+		// Config 配置管理
+		configH := NewConfigHandler(deps)
+		r.Get("/config", configH.GetConfig)
+		r.Post("/config", configH.SaveConfig)
 	})
 
 	// WebSocket
@@ -71,6 +77,7 @@ func NewRouter(deps *Dependencies) http.Handler {
 	web := NewWebHandler(deps)
 	r.Get("/", web.IndexPage)
 	r.Get("/tasks/list", web.TaskList)
+	r.Get("/settings", web.SettingsPage)
 
 	return r
 }

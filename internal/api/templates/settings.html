@@ -1,0 +1,399 @@
+{{define "content"}}
+<style>
+    .settings-form { max-width: 800px; }
+    .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 24px 0 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--black);
+    }
+    .section-title:first-child { margin-top: 0; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .help-text { font-size: 0.75rem; color: var(--black); margin-top: 4px; opacity: 0.7; }
+    .api-key-input { font-family: monospace; font-size: 0.8rem; }
+    .save-bar {
+        position: sticky;
+        bottom: 20px;
+        background: var(--white);
+        border: 2px solid var(--black);
+        padding: 16px;
+        margin-top: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .save-result { font-size: 0.875rem; margin-left: 16px; }
+</style>
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="margin:0;border:none;padding:0;">⚙️ 系统配置</h2>
+        <a href="/" class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem;">← 返回首页</a>
+    </div>
+
+    <form id="config-form" class="settings-form" onsubmit="saveConfig(event)">
+        <!-- LLM 配置 -->
+        <div class="section-title">🤖 LLM 文案生成</div>
+        <div class="form-group">
+            <label>Provider</label>
+            <select name="llm.provider" id="llm-provider">
+                <option value="openai">OpenAI</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="ollama">Ollama (本地)</option>
+            </select>
+        </div>
+
+        <div id="openai-config" class="llm-section">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" name="llm.openai.api_key" class="api-key-input" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" name="llm.openai.base_url" placeholder="https://api.openai.com/v1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <input type="text" name="llm.openai.model" placeholder="gpt-4o-mini">
+            </div>
+        </div>
+
+        <div id="deepseek-config" class="llm-section">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" name="llm.deepseek.api_key" class="api-key-input" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" name="llm.deepseek.base_url" placeholder="https://api.deepseek.com">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" name="llm.deepseek.model" placeholder="deepseek-v4-pro">
+                </div>
+                <div class="form-group">
+                    <label>Reasoning Effort</label>
+                    <select name="llm.deepseek.reasoning_effort">
+                        <option value="">默认</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" name="llm.deepseek.enable_thinking"> 启用思考模式</label>
+            </div>
+        </div>
+
+        <div id="ollama-config" class="llm-section">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" name="llm.ollama.base_url" placeholder="http://localhost:11434">
+                </div>
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" name="llm.ollama.model" placeholder="llama3">
+                </div>
+            </div>
+        </div>
+
+        <!-- TTS 配置 -->
+        <div class="section-title">🔊 TTS 语音合成</div>
+        <div class="form-group">
+            <label>Provider</label>
+            <select name="tts.provider">
+                <option value="edge">Edge TTS (免费)</option>
+                <option value="azure">Azure TTS</option>
+                <option value="openai">OpenAI TTS</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Azure Speech Key</label>
+                <input type="text" name="tts.azure.speech_key" class="api-key-input" placeholder="可选">
+            </div>
+            <div class="form-group">
+                <label>Azure Speech Region</label>
+                <input type="text" name="tts.azure.speech_region" placeholder="eastus">
+            </div>
+        </div>
+
+        <!-- 素材配置 -->
+        <div class="section-title">🎬 素材来源</div>
+        <div class="form-group">
+            <label>默认素材来源</label>
+            <select name="material.source">
+                <option value="pexels">Pexels (搜索视频)</option>
+                <option value="pixabay">Pixabay (搜索视频)</option>
+                <option value="local">本地素材</option>
+                <option value="aliyun_image">阿里云 AI 生成图片</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Pexels API Keys（逗号分隔）</label>
+            <input type="text" name="material.pexels.api_keys" class="api-key-input" placeholder="key1,key2">
+            <div class="help-text">免费申请: https://www.pexels.com/api/</div>
+        </div>
+        <div class="form-group">
+            <label>Pixabay API Keys（逗号分隔）</label>
+            <input type="text" name="material.pixabay.api_keys" class="api-key-input" placeholder="key1,key2">
+            <div class="help-text">免费申请: https://pixabay.com/api/docs/</div>
+        </div>
+        <div class="form-group">
+            <label>本地素材目录</label>
+            <input type="text" name="material.local_dir" placeholder="/path/to/videos">
+        </div>
+
+        <div class="section-title">🖼️ AI 图片生成 (阿里云)</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="text" name="material.aliyun_image.api_key" class="api-key-input" placeholder="可选">
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <input type="text" name="material.aliyun_image.model" placeholder="z-image-turbo">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>每关键词图片数</label>
+                <input type="number" name="material.aliyun_image.image_count" min="1" max="10" placeholder="1">
+            </div>
+            <div class="form-group">
+                <label>每张图片时长 (秒)</label>
+                <input type="number" name="material.aliyun_image.clip_seconds" min="1" max="30" placeholder="5">
+            </div>
+        </div>
+
+        <!-- Worker 配置 -->
+        <div class="section-title">⚡ Worker Pool</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>最小 Workers</label>
+                <input type="number" name="worker.min_workers" min="1" max="16" placeholder="1">
+            </div>
+            <div class="form-group">
+                <label>最大 Workers</label>
+                <input type="number" name="worker.max_workers" min="1" max="32" placeholder="4">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>CPU 高水位</label>
+                <input type="number" name="worker.high_water_mark" min="0.1" max="1" step="0.05" placeholder="0.85">
+                <div class="help-text">超过此值开始缩减 Worker</div>
+            </div>
+            <div class="form-group">
+                <label>CPU 低水位</label>
+                <input type="number" name="worker.low_water_mark" min="0.1" max="1" step="0.05" placeholder="0.50">
+                <div class="help-text">低于此值开始扩容</div>
+            </div>
+        </div>
+
+        <!-- FFmpeg 配置 -->
+        <div class="section-title">🎞️ FFmpeg</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>FFmpeg 路径</label>
+                <input type="text" name="ffmpeg.binary_path" placeholder="留空自动检测">
+            </div>
+            <div class="form-group">
+                <label>视频编码</label>
+                <select name="ffmpeg.video_codec">
+                    <option value="libx264">libx264 (H.264)</option>
+                    <option value="libx265">libx265 (H.265)</option>
+                    <option value="h264_videotoolbox">h264_videotoolbox (Apple)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Server 配置 -->
+        <div class="section-title">🌐 服务器</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>监听地址</label>
+                <input type="text" name="server.host" placeholder="0.0.0.0">
+            </div>
+            <div class="form-group">
+                <label>端口</label>
+                <input type="number" name="server.port" min="1" max="65535" placeholder="8080">
+            </div>
+        </div>
+
+        <!-- 保存按钮 -->
+        <div class="save-bar">
+            <div>
+                <button type="submit" class="btn btn-primary" style="padding:10px 24px;">💾 保存配置</button>
+                <span id="save-result" class="save-result"></span>
+            </div>
+            <a href="/" class="btn btn-danger">取消</a>
+        </div>
+    </form>
+</div>
+
+<script>
+// 加载配置
+async function loadConfig() {
+    try {
+        const resp = await fetch('/api/v1/config');
+        const cfg = await resp.json();
+        
+        // 填充表单
+        document.querySelector('[name="llm.provider"]').value = cfg.llm.provider || 'openai';
+        document.querySelector('[name="llm.openai.api_key"]').value = cfg.llm.openai.api_key || '';
+        document.querySelector('[name="llm.openai.base_url"]').value = cfg.llm.openai.base_url || '';
+        document.querySelector('[name="llm.openai.model"]').value = cfg.llm.openai.model || '';
+        document.querySelector('[name="llm.deepseek.api_key"]').value = cfg.llm.deepseek.api_key || '';
+        document.querySelector('[name="llm.deepseek.base_url"]').value = cfg.llm.deepseek.base_url || '';
+        document.querySelector('[name="llm.deepseek.model"]').value = cfg.llm.deepseek.model || '';
+        document.querySelector('[name="llm.deepseek.reasoning_effort"]').value = cfg.llm.deepseek.reasoning_effort || '';
+        document.querySelector('[name="llm.deepseek.enable_thinking"]').checked = cfg.llm.deepseek.enable_thinking;
+        document.querySelector('[name="llm.ollama.base_url"]').value = cfg.llm.ollama.base_url || '';
+        document.querySelector('[name="llm.ollama.model"]').value = cfg.llm.ollama.model || '';
+        
+        document.querySelector('[name="tts.provider"]').value = cfg.tts.provider || 'edge';
+        document.querySelector('[name="tts.azure.speech_key"]').value = cfg.tts.azure.speech_key || '';
+        document.querySelector('[name="tts.azure.speech_region"]').value = cfg.tts.azure.speech_region || '';
+        
+        document.querySelector('[name="material.source"]').value = cfg.material.source || 'pexels';
+        document.querySelector('[name="material.pexels.api_keys"]').value = cfg.material.pexels.api_keys || '';
+        document.querySelector('[name="material.pixabay.api_keys"]').value = cfg.material.pixabay.api_keys || '';
+        document.querySelector('[name="material.local_dir"]').value = cfg.material.local_dir || '';
+        document.querySelector('[name="material.aliyun_image.api_key"]').value = cfg.material.aliyun_image.api_key || '';
+        document.querySelector('[name="material.aliyun_image.model"]').value = cfg.material.aliyun_image.model || '';
+        document.querySelector('[name="material.aliyun_image.image_count"]').value = cfg.material.aliyun_image.image_count || 1;
+        document.querySelector('[name="material.aliyun_image.clip_seconds"]').value = cfg.material.aliyun_image.clip_seconds || 5;
+        
+        document.querySelector('[name="worker.min_workers"]').value = cfg.worker.min_workers || 1;
+        document.querySelector('[name="worker.max_workers"]').value = cfg.worker.max_workers || 4;
+        document.querySelector('[name="worker.high_water_mark"]').value = cfg.worker.high_water_mark || 0.85;
+        document.querySelector('[name="worker.low_water_mark"]').value = cfg.worker.low_water_mark || 0.50;
+        
+        document.querySelector('[name="ffmpeg.binary_path"]').value = cfg.ffmpeg.binary_path || '';
+        document.querySelector('[name="ffmpeg.video_codec"]').value = cfg.ffmpeg.video_codec || 'libx264';
+        
+        document.querySelector('[name="server.host"]').value = cfg.server.host || '0.0.0.0';
+        document.querySelector('[name="server.port"]').value = cfg.server.port || 8080;
+        
+        updateLLMVisibility();
+    } catch(e) {
+        console.error('加载配置失败:', e);
+    }
+}
+
+// LLM Provider 切换显示
+function updateLLMVisibility() {
+    const provider = document.querySelector('[name="llm.provider"]').value;
+    document.querySelectorAll('.llm-section').forEach(el => el.style.display = 'none');
+    const section = document.getElementById(provider + '-config');
+    if (section) section.style.display = 'block';
+}
+document.querySelector('[name="llm.provider"]').addEventListener('change', updateLLMVisibility);
+
+// 保存配置
+async function saveConfig(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const config = {
+        server: {
+            host: formData.get('server.host'),
+            port: parseInt(formData.get('server.port')) || 8080
+        },
+        queue: { buffer_size: 100, db_path: './data/queue.db' },
+        worker: {
+            min_workers: parseInt(formData.get('worker.min_workers')) || 1,
+            max_workers: parseInt(formData.get('worker.max_workers')) || 4,
+            high_water_mark: parseFloat(formData.get('worker.high_water_mark')) || 0.85,
+            low_water_mark: parseFloat(formData.get('worker.low_water_mark')) || 0.50
+        },
+        llm: {
+            provider: formData.get('llm.provider'),
+            openai: {
+                api_key: formData.get('llm.openai.api_key'),
+                base_url: formData.get('llm.openai.base_url'),
+                model: formData.get('llm.openai.model')
+            },
+            deepseek: {
+                api_key: formData.get('llm.deepseek.api_key'),
+                base_url: formData.get('llm.deepseek.base_url'),
+                model: formData.get('llm.deepseek.model'),
+                enable_thinking: form.querySelector('[name="llm.deepseek.enable_thinking"]').checked,
+                reasoning_effort: formData.get('llm.deepseek.reasoning_effort')
+            },
+            ollama: {
+                base_url: formData.get('llm.ollama.base_url'),
+                model: formData.get('llm.ollama.model')
+            }
+        },
+        tts: {
+            provider: formData.get('tts.provider'),
+            azure: {
+                speech_key: formData.get('tts.azure.speech_key'),
+                speech_region: formData.get('tts.azure.speech_region')
+            },
+            openai: { api_key: '', base_url: '', model: '', voice: '' }
+        },
+        subtitle: { provider: 'edge' },
+        material: {
+            source: formData.get('material.source'),
+            local_dir: formData.get('material.local_dir'),
+            pexels: { api_keys: formData.get('material.pexels.api_keys') },
+            pixabay: { api_keys: formData.get('material.pixabay.api_keys') },
+            aliyun_image: {
+                api_key: formData.get('material.aliyun_image.api_key'),
+                model: formData.get('material.aliyun_image.model'),
+                image_count: parseInt(formData.get('material.aliyun_image.image_count')) || 1,
+                clip_seconds: parseInt(formData.get('material.aliyun_image.clip_seconds')) || 5
+            }
+        },
+        ffmpeg: {
+            binary_path: formData.get('ffmpeg.binary_path'),
+            video_codec: formData.get('ffmpeg.video_codec')
+        }
+    };
+    
+    const resultSpan = document.getElementById('save-result');
+    resultSpan.textContent = '保存中...';
+    resultSpan.style.color = '#000';
+    
+    try {
+        const resp = await fetch('/api/v1/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+        const data = await resp.json();
+        if (data.error) {
+            resultSpan.textContent = '❌ ' + data.error;
+            resultSpan.style.color = '#000';
+            resultSpan.style.fontWeight = '700';
+        } else {
+            resultSpan.textContent = '✅ ' + data.message;
+            resultSpan.style.color = '#000';
+            resultSpan.style.fontWeight = '700';
+        }
+    } catch(e) {
+        resultSpan.textContent = '❌ 请求失败: ' + e.message;
+        resultSpan.style.color = '#000';
+        resultSpan.style.fontWeight = '700';
+    }
+}
+
+// 初始化
+loadConfig();
+</script>
+{{end}}
