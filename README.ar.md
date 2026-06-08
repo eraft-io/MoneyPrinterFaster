@@ -158,6 +158,49 @@ make build-linux
 
 زر `http://localhost:8080` بعد البدء.
 
+### النشر باستخدام Docker
+
+لا حاجة لتثبيت Go / FFmpeg / Python، شغّل بأمر واحد:
+
+```bash
+# 1. تحضير الإعدادات
+cp config.example.toml config.toml
+# عدّل config.toml لإضافة مفاتيح API
+
+# 2. بناء وتشغيل
+docker compose up -d
+```
+
+أو باستخدام Makefile:
+
+```bash
+make docker        # بناء الصورة
+make docker-run    # تشغيل الحاوية
+make docker-stop   # إيقاف الحاوية
+```
+
+أو مباشرة مع docker:
+
+```bash
+docker build -t moneyprinter-faster .
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v mpf-data:/app/data \
+  --name moneyprinter \
+  --restart unless-stopped \
+  moneyprinter-faster
+```
+
+**نقاط التحميل:**
+
+| مسار التحميل | الوصف |
+|--------------|-------|
+| `config.toml:/app/config.toml` | ملف الإعدادات، أعد تشغيل الحاوية لتطبيق التغييرات |
+| `mpf-data:/app/data` | دليل البيانات (SQLite + مخرجات الفيديو)، تخزين دائم |
+
+> صورة Docker تتضمن FFmpeg و edge-tts والخطوط الصينية (Noto Sans CJK) جاهزة للاستخدام.
+
 ### سير العمل
 
 1. أدخل موضوع الفيديو (مثال: "مستقبل الذكاء الاصطناعي")

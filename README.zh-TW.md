@@ -140,6 +140,49 @@ make build-linux
 
 啟動後訪問 `http://localhost:8080`。
 
+### Docker 部署
+
+無需安裝 Go / FFmpeg / Python，一條命令即可運行：
+
+```bash
+# 1. 準備設定檔
+cp config.example.toml config.toml
+# 編輯 config.toml 填寫 API Key
+
+# 2. 建構並啟動
+docker compose up -d
+```
+
+或使用 Makefile：
+
+```bash
+make docker        # 建構映像檔
+make docker-run    # 啟動容器
+make docker-stop   # 停止容器
+```
+
+也可以直接 docker run：
+
+```bash
+docker build -t moneyprinter-faster .
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v mpf-data:/app/data \
+  --name moneyprinter \
+  --restart unless-stopped \
+  moneyprinter-faster
+```
+
+**卷掛載說明：**
+
+| 掛載路徑 | 說明 |
+|----------|------|
+| `config.toml:/app/config.toml` | 設定檔，修改後重啟容器生效 |
+| `mpf-data:/app/data` | 資料目錄（SQLite + 影片輸出），持久化不丟失 |
+
+> Docker 映像檔內建 FFmpeg、edge-tts、中文字型（Noto Sans CJK），開箱即用。
+
 ### 使用流程
 
 1. 輸入影片主題（如「人工智慧的未來」）

@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+*.exe
+
+# Data (use Docker volume)
+data/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docs
+docs/
+*.md
+!README.md
+
+# Videos
+vedios/

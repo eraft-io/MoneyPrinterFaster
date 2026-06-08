@@ -138,6 +138,49 @@ make build-darwin
 make build-linux
 ```
 
+### Docker 部署
+
+无需安装 Go / FFmpeg / Python，一条命令即可运行：
+
+```bash
+# 1. 准备配置文件
+cp config.example.toml config.toml
+# 编辑 config.toml 填写 API Key
+
+# 2. 构建并启动
+docker compose up -d
+```
+
+或使用 Makefile：
+
+```bash
+make docker        # 构建镜像
+make docker-run    # 启动容器
+make docker-stop   # 停止容器
+```
+
+也可以直接 docker run：
+
+```bash
+docker build -t moneyprinter-faster .
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v mpf-data:/app/data \
+  --name moneyprinter \
+  --restart unless-stopped \
+  moneyprinter-faster
+```
+
+**卷挂载说明：**
+
+| 挂载路径 | 说明 |
+|----------|------|
+| `config.toml:/app/config.toml` | 配置文件，修改后重启容器生效 |
+| `mpf-data:/app/data` | 数据目录（SQLite + 视频输出），持久化不丢失 |
+
+> Docker 镜像内置 FFmpeg、edge-tts、中文字体（Noto Sans CJK），开箱即用。
+
 启动后访问 `http://localhost:8080`。
 
 ### 使用流程
