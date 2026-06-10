@@ -4,7 +4,7 @@ BUILD_DIR := ./build
 DOCKER_IMAGE := moneyprinter-faster
 LDFLAGS  := -ldflags "-X main.Version=$(VERSION)"
 
-.PHONY: all build run clean test fmt vet tidy docker docker-run docker-stop
+.PHONY: all build run clean test fmt vet tidy docker docker-build-amd64 docker-run docker-stop
 
 all: tidy build
 
@@ -55,6 +55,17 @@ docker:
 	@echo "运行命令:"
 	@echo "  make docker-run"
 	@echo "  docker run -d -p 8080:8080 -v \$\$(pwd)/config.toml:/app/config.toml -v mpf-data:/app/data $(DOCKER_IMAGE)"
+
+# 在 ARM 机器上构建 x86 镜像（需要 buildx + QEMU）
+docker-build-amd64:
+	@echo "🔨 正在构建 linux/amd64 镜像..."
+	docker buildx build --platform linux/amd64 -t $(DOCKER_IMAGE):$(VERSION)-amd64 -t $(DOCKER_IMAGE):latest-amd64 --load .
+	@echo ""
+	@echo "✅ x86 Docker 镜像构建完成: $(DOCKER_IMAGE):latest-amd64"
+	@echo ""
+	@echo "推送到远程仓库:"
+	@echo "  docker push $(DOCKER_IMAGE):$(VERSION)-amd64"
+	@echo "  docker push $(DOCKER_IMAGE):latest-amd64"
 
 docker-run:
 	docker run -d \
