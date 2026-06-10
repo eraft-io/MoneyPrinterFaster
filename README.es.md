@@ -6,7 +6,6 @@
 
 Pipeline automatizado de producción de vídeos cortos construido con Go. Solo proporciona un tema — el sistema se encarga automáticamente de la generación de guiones con LLM → síntesis de voz TTS → generación de subtítulos → descarga de materiales → composición de audio y vídeo, produciendo finalmente un vídeo MP4 con subtítulos + BGM.
 
-**Demo en línea: [http://47.99.221.247:8080/](http://47.99.221.247:8080/)**
 
 ## Arquitectura
 

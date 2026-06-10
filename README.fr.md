@@ -6,8 +6,6 @@
 
 Pipeline de production automatisée de vidéos courtes construit avec Go. Fournissez simplement un sujet — le système gère automatiquement la génération de scripts par LLM → synthèse vocale TTS → génération de sous-titres → téléchargement de matériaux → composition audio-vidéo, produisant finalement une vidéo MP4 avec sous-titres + BGM.
 
-**Démo en ligne : [http://47.99.221.247:8080/](http://47.99.221.247:8080/)**
-
 ## Architecture
 
 ```

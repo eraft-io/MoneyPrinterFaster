@@ -6,8 +6,6 @@
 
 An automated short video production pipeline built with Go. Just provide a topic — the system automatically handles LLM script generation → TTS voiceover → subtitle generation → material download → audio-video composition, ultimately outputting an MP4 video with subtitles + BGM.
 
-**Live Demo: [http://47.99.221.247:8080/](http://47.99.221.247:8080/)**
-
 ## Architecture
 
 ```
