@@ -3,7 +3,13 @@
 # ============================================
 FROM golang:1.25-alpine AS builder
 
+# Use domestic mirror for Alpine apk
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 WORKDIR /build
+
+# Use domestic Go module proxy
+ENV GOPROXY=https://goproxy.cn,direct
 
 # Cache dependencies
 COPY go.mod go.sum ./
@@ -19,9 +25,20 @@ RUN CGO_ENABLED=0 go build -ldflags "-X main.Version=$(cat VERSION 2>/dev/null |
 # ============================================
 FROM python:3.12-slim
 
+# Use domestic mirrors
+# Debian apt: mirrors.tuna.tsinghua.edu.cn
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
+
+# PyPI: mirrors.aliyun.com
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+    pip config set global.trusted-host mirrors.aliyun.com
+
 # Install FFmpeg and common utilities
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y --no-install-recommends --fix-missing \
+        -o APT::Acquire::Retries=5 \
+        -o APT::Acquire::https::Timeout=30 \
         ffmpeg \
         fonts-noto-cjk \
         ca-certificates \
